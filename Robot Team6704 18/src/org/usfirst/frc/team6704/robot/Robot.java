@@ -17,6 +17,7 @@ import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.GamepadBase;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.GenericHID.Hand;
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -36,12 +37,15 @@ public class Robot extends IterativeRobot {
 	 * used for any initialization code.
 	 */
 	
+	private Hand left;
 	private Spark SparkR;
 	private Spark SparkL;
 	private Victor VictorR; 
 	private Victor VictorL;
 	private Solenoid Solenoid0;
 	private Solenoid Solenoid1;
+	private Solenoid Solenoid2;
+	private Solenoid Solenoid3;
 	private Joystick m_LeftStick;
 	private XboxController BumperOpen;
 	private XboxController BumperClose;
@@ -60,9 +64,12 @@ public class Robot extends IterativeRobot {
 		VictorL = new Victor(3);
 		Solenoid0 = new Solenoid(0);
 		Solenoid1 = new Solenoid(1);
-		m_LeftStick = new Joystick(0);
-//		BumperOpen = new GamepadBase(0);
-//		BumperClose = new  Bumper(0);
+		Solenoid2 = new Solenoid(2);
+		Solenoid3 = new Solenoid(3);
+		 m_LeftStick= new Joystick(0);
+		BumperOpen = new  XboxController(0);
+		
+		
 		
 		
 		
@@ -114,8 +121,10 @@ public class Robot extends IterativeRobot {
 		SparkL.set(m_LeftStick.getX());
 		VictorR.set(m_LeftStick.getY());
 		VictorL.set(m_LeftStick.getY());
-		Solenoid0.set(m_LeftStick.getBumper());
-		Solenoid1.set(!(m_LeftStick.getTrigger()));
+		Solenoid0.set(BumperOpen.getBumper(left.kLeft));
+		Solenoid1.set(!(BumperOpen.getBumper(left.kLeft)));
+		Solenoid2.set(BumperOpen.getBumper(left.kRight));
+		Solenoid3.set(!(BumperOpen.getBumper(left.kRight)));
 	}
 
 	/**

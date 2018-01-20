@@ -1,7 +1,9 @@
 LaunchTargetManager/org.eclipse.launchbar.core.launchTargetType.local,Local/arch=x86_64
 LaunchTargetManager/org.eclipse.launchbar.core.launchTargetType.local,Local/name=Local
 LaunchTargetManager/org.eclipse.launchbar.core.launchTargetType.local,Local/os=win32
-configDescList=org.eclipse.launchbar.core.descriptorType.default\:build.xml,org.eclipse.launchbar.core.descriptorType.default\:build.xml (1),org.eclipse.launchbar.core.descriptorType.default\:build.xml (2),org.eclipse.launchbar.core.descriptorType.default\:build.xml (3),org.eclipse.launchbar.core.descriptorType.default\:build.xml (4)
+configDescList=org.eclipse.launchbar.core.descriptorType.default\:build.xml,org.eclipse.launchbar.core.descriptorType.default\:build.xml (1),org.eclipse.launchbar.core.descriptorType.default\:build.xml (2),org.eclipse.launchbar.core.descriptorType.default\:build.xml (3),org.eclipse.launchbar.core.descriptorType.default\:build.xml (4),org.eclipse.launchbar.core.descriptorType.default\:build.xml (5),org.eclipse.launchbar.core.descriptorType.default\:build.xml (6),org.eclipse.launchbar.core.descriptorType.default\:build.xml (7),org.eclipse.launchbar.core.descriptorType.default\:build.xml (8),org.eclipse.launchbar.core.descriptorType.default\:build.xml (9),org.eclipse.launchbar.core.descriptorType.default\:build.xml (10)
 eclipse.preferences.version=1
+org.eclipse.launchbar.core.descriptorType.default\:build.xml\ (1)/activeLaunchMode=run
+org.eclipse.launchbar.core.descriptorType.default\:build.xml\ (1)/activeLaunchTarget=org.eclipse.launchbar.core.launchTargetType.local\:Local
 org.eclipse.launchbar.core.descriptorType.default\:build.xml/activeLaunchMode=run
 org.eclipse.launchbar.core.descriptorType.default\:build.xml/activeLaunchTarget=org.eclipse.launchbar.core.launchTargetType.local\:Local
