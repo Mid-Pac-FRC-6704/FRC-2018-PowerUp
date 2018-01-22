@@ -8,12 +8,15 @@
 package org.usfirst.frc.team6704.robot;
 
 import edu.wpi.first.wpilibj.IterativeRobot;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+//import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj.Spark;
 import edu.wpi.first.wpilibj.Victor;
 import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.Joystick;
+
+import edu.wpi.first.wpilibj.Timer;
+
 import edu.wpi.first.wpilibj.GamepadBase;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
@@ -36,7 +39,7 @@ public class Robot extends IterativeRobot {
 	 * This function is run when the robot is first started up and should be
 	 * used for any initialization code.
 	 */
-	
+//	private SmartDashboard Dashboard;
 	private Hand left;
 	private Spark SparkR;
 	private Spark SparkL;
@@ -49,6 +52,8 @@ public class Robot extends IterativeRobot {
 	private Joystick m_LeftStick;
 	private XboxController BumperOpen;
 	private XboxController BumperClose;
+	public Timer timer;
+	double speedUp = 0.0;
 	
 	
 	@Override
@@ -57,7 +62,7 @@ public class Robot extends IterativeRobot {
 		m_chooser.addObject("My Auto", kCustomAuto);
 		SmartDashboard.putData("Auto choices", m_chooser);
 		
-		
+		timer = new Timer();
 		SparkR = new Spark(0);
 		SparkL = new Spark(1);
 		VictorR = new Victor(2);
@@ -66,10 +71,10 @@ public class Robot extends IterativeRobot {
 		Solenoid1 = new Solenoid(1);
 		Solenoid2 = new Solenoid(2);
 		Solenoid3 = new Solenoid(3);
-		 m_LeftStick= new Joystick(0);
+		m_LeftStick= new Joystick(0);
 		BumperOpen = new  XboxController(0);
 		
-		
+//		Dashboard = new SmartDashboard();
 		
 		
 		
@@ -88,11 +93,17 @@ public class Robot extends IterativeRobot {
 	 * SendableChooser make sure to add them to the chooser code above as well.
 	 */
 	@Override
-	public void autonomousInit() {
+	public void autonomousInit() { 
+		timer.start();
 		m_autoSelected = m_chooser.getSelected();
 		// autoSelected = SmartDashboard.getString("Auto Selector",
 		// defaultAuto);
+		Solenoid0.set(false);
+		Solenoid1.set(true);
 		System.out.println("Auto selected: " + m_autoSelected);
+		SmartDashboard.putNumber("Robot Timer", timer.get());
+		
+		
 	}
 
 	/**
@@ -100,7 +111,24 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void autonomousPeriodic() {
-		switch (m_autoSelected) {
+		
+	
+//		timer.start();
+//		SmartDashboard.putString("DB/String 0",timer.get());
+		SmartDashboard.putNumber("Robot timer",timer.get());
+		if (speedUp >= 1) {
+			speedUp = 1;
+		}
+		SparkR.set(speedUp);
+		SparkL.set(speedUp);
+		if (timer.get() > 5) {
+			Solenoid0.set(true);
+			Solenoid1.set(false);
+		} else if (timer.get() >= 10) {
+			Solenoid0.set(false);
+			Solenoid1.set(true);
+		}
+		/*switch (m_autoSelected) {
 			case kCustomAuto:
 				// Put custom auto code here
 				break;
@@ -109,28 +137,57 @@ public class Robot extends IterativeRobot {
 				// Put default auto code here
 				break;
 		}
+		*/
+		speedUp += 0.01;
+		SmartDashboard.putNumber("speedUp Timer", speedUp);
+		SmartDashboard.updateValues();
+		
 	}
 
 	/**
 	 * This function is called periodically during operator control.
 	 */
+	
+		
 	@Override
 	public void teleopPeriodic() {
 		
-		SparkR.set(m_LeftStick.getX());
-		SparkL.set(m_LeftStick.getX());
-		VictorR.set(m_LeftStick.getY());
-		VictorL.set(m_LeftStick.getY());
+		SparkR.set(BumperOpen.getX(left.kLeft));
+		SparkL.set(BumperOpen.getX(left.kLeft));
+		VictorR.set(BumperOpen.getX(left.kRight));
+		VictorL.set(BumperOpen.getX(left.kRight));
 		Solenoid0.set(BumperOpen.getBumper(left.kLeft));
 		Solenoid1.set(!(BumperOpen.getBumper(left.kLeft)));
 		Solenoid2.set(BumperOpen.getBumper(left.kRight));
 		Solenoid3.set(!(BumperOpen.getBumper(left.kRight)));
+		SmartDashboard.putNumber("Controller speed", BumperOpen.getX(left.kLeft));
 	}
-
+	
+//	@Override
+	public void diabledPeriodic() {
+		SparkR.set(0);
+		SparkL.set(0);
+		VictorR.set(0);
+		VictorL.set(0);
+		Solenoid0.set(false);
+		Solenoid1.set(true);
+		SmartDashboard.putString("DB/String 0"," testing ");
+		timer.stop();
+		timer.reset();
+		speedUp=0;
+	}
+	
+	
 	/**
 	 * This function is called periodically during test mode.
 	 */
 	@Override
 	public void testPeriodic() {
+		SparkR.set(1.0);
+		SparkL.set(-1.0);
+		VictorR.set(1.0);
+		VictorL.set(-1.0);
+		Solenoid0.set(true);
+		Solenoid1.set(false);
 	}
 }
