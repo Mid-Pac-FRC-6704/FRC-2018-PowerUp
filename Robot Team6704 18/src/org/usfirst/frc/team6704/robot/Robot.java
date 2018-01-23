@@ -54,6 +54,9 @@ public class Robot extends IterativeRobot {
 	private XboxController BumperClose;
 	public Timer timer;
 	double speedUp = 0.0;
+	public Left Left;
+	public Right Right;
+	public None None;
 	
 	
 	@Override
@@ -72,7 +75,7 @@ public class Robot extends IterativeRobot {
 		Solenoid2 = new Solenoid(2);
 		Solenoid3 = new Solenoid(3);
 		m_LeftStick= new Joystick(0);
-		BumperOpen = new  XboxController(0);
+		Controller = new  XboxController(0);
 		
 //		Dashboard = new SmartDashboard();
 		
@@ -103,6 +106,23 @@ public class Robot extends IterativeRobot {
 		System.out.println("Auto selected: " + m_autoSelected);
 		SmartDashboard.putNumber("Robot Timer", timer.get());
 		
+		String sendable = "";
+        sendable = DriverStation.getInstance().getGameSpecificMessage();
+        
+        switch (sendable.charAt(0)) {
+            case 'L':
+            	SmartDashboard.putNumber("Left", Left);
+                // Put autonomous code here for the switch being on the left side
+                break;
+            case 'R':
+            	SmartDashboard.putNumber("Right", Right);
+                // Put autonomous code here for the switch being on the right side.
+                break;
+            default:
+            	SmartDashboard.putNumber("None", None);
+                // Put default auto code here
+                break;
+        }
 		
 	}
 
@@ -175,6 +195,7 @@ public class Robot extends IterativeRobot {
 		timer.stop();
 		timer.reset();
 		speedUp=0;
+		SmartDashboard.updateValues();
 	}
 	
 	
