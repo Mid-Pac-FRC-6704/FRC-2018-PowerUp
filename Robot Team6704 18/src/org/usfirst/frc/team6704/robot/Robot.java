@@ -8,19 +8,18 @@
 package org.usfirst.frc.team6704.robot;
 
 import edu.wpi.first.wpilibj.IterativeRobot;
-//import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import edu.wpi.first.wpilibj.smartdashboard.*;
-import edu.wpi.first.wpilibj.Spark;
-import edu.wpi.first.wpilibj.Victor;
-import edu.wpi.first.wpilibj.Solenoid;
-import edu.wpi.first.wpilibj.Joystick;
-
 import edu.wpi.first.wpilibj.Timer;
 
-import edu.wpi.first.wpilibj.GamepadBase;
-import edu.wpi.first.wpilibj.GenericHID;
+import edu.wpi.first.wpilibj.smartdashboard.*;
+
+import edu.wpi.first.wpilibj.GenericHID.*;
 import edu.wpi.first.wpilibj.XboxController;
-import edu.wpi.first.wpilibj.GenericHID.Hand;
+
+import edu.wpi.first.wpilibj.Spark;
+import edu.wpi.first.wpilibj.Victor;
+import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.Solenoid;
+
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -35,30 +34,33 @@ public class Robot extends IterativeRobot {
 	private String m_autoSelected;
 	private SendableChooser<String> m_chooser = new SendableChooser<>();
 
+	public Timer timer;
+	
+	private Spark trMotor; //Top Right Drive Motor
+	private Spark tlMotor; //Top Left Drive Motor
+	private Spark brMotor; //Bottom Right Drive Motor
+	private Spark blMotor; //Bottom Left Drive Motor
+	
+	private double rSpeed;
+	private double lSpeed;
+	
+	private Victor arm; //Arm Motor
+	private Victor rWinch; //Right Winch Motor
+	private Victor lWinch; //Left Winch Motor
+	
+	private Solenoid clawOpen; //Solenoid for opening claw
+	private Solenoid clawClose; //Solenoid for closing claw
+	private Solenoid scissorOpen; //Solenoid for opening scissor lift
+	private Solenoid scissorClose; //Solenoid for closing scissor lift
+	
+	private Hand hand;
+	private static XboxController controller;
+	private Joystick stick;
+	
 	/**
 	 * This function is run when the robot is first started up and should be
 	 * used for any initialization code.
 	 */
-//	private SmartDashboard Dashboard;
-	private Hand left;
-	private Spark SparkR;
-	private Spark SparkL;
-	private Victor VictorR; 
-	private Victor VictorL;
-	private Solenoid Solenoid0;
-	private Solenoid Solenoid1;
-	private Solenoid Solenoid2;
-	private Solenoid Solenoid3;
-	private Joystick m_LeftStick;
-	private XboxController BumperOpen;
-	private XboxController BumperClose;
-	public Timer timer;
-	double speedUp = 0.0;
-	public Left Left;
-	public Right Right;
-	public None None;
-	
-	
 	@Override
 	public void robotInit() {
 		m_chooser.addDefault("Default Auto", kDefaultAuto);
@@ -66,23 +68,20 @@ public class Robot extends IterativeRobot {
 		SmartDashboard.putData("Auto choices", m_chooser);
 		
 		timer = new Timer();
-		SparkR = new Spark(0);
-		SparkL = new Spark(1);
-		VictorR = new Victor(2);
-		VictorL = new Victor(3);
-		Solenoid0 = new Solenoid(0);
-		Solenoid1 = new Solenoid(1);
-		Solenoid2 = new Solenoid(2);
-		Solenoid3 = new Solenoid(3);
-		m_LeftStick= new Joystick(0);
-		Controller = new  XboxController(0);
 		
-//		Dashboard = new SmartDashboard();
+		trMotor = new Spark(0);
+		tlMotor = new Spark(1);
+		brMotor = new Spark(2);
+		blMotor = new Spark(3);
 		
+		clawOpen = new Solenoid(0);
+		clawClose = new Solenoid(1);
+		scissorOpen = new Solenoid(2);
+		scissorClose = new Solenoid(3);
 		
-		
+		stick = new Joystick(0);
+		controller = new XboxController(0);
 	}
-
 
 	/**
 	 * This autonomous (along with the chooser code above) shows how to select
@@ -96,34 +95,11 @@ public class Robot extends IterativeRobot {
 	 * SendableChooser make sure to add them to the chooser code above as well.
 	 */
 	@Override
-	public void autonomousInit() { 
-		timer.start();
+	public void autonomousInit() {
 		m_autoSelected = m_chooser.getSelected();
 		// autoSelected = SmartDashboard.getString("Auto Selector",
 		// defaultAuto);
-		Solenoid0.set(false);
-		Solenoid1.set(true);
 		System.out.println("Auto selected: " + m_autoSelected);
-		SmartDashboard.putNumber("Robot Timer", timer.get());
-		
-		String sendable = "";
-        sendable = DriverStation.getInstance().getGameSpecificMessage();
-        
-        switch (sendable.charAt(0)) {
-            case 'L':
-            	SmartDashboard.putNumber("Left", Left);
-                // Put autonomous code here for the switch being on the left side
-                break;
-            case 'R':
-            	SmartDashboard.putNumber("Right", Right);
-                // Put autonomous code here for the switch being on the right side.
-                break;
-            default:
-            	SmartDashboard.putNumber("None", None);
-                // Put default auto code here
-                break;
-        }
-		
 	}
 
 	/**
@@ -131,24 +107,7 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void autonomousPeriodic() {
-		
-	
-//		timer.start();
-//		SmartDashboard.putString("DB/String 0",timer.get());
-		SmartDashboard.putNumber("Robot timer",timer.get());
-		if (speedUp >= 1) {
-			speedUp = 1;
-		}
-		SparkR.set(speedUp);
-		SparkL.set(speedUp);
-		if (timer.get() > 5) {
-			Solenoid0.set(true);
-			Solenoid1.set(false);
-		} else if (timer.get() >= 10) {
-			Solenoid0.set(false);
-			Solenoid1.set(true);
-		}
-		/*switch (m_autoSelected) {
+		switch (m_autoSelected) {
 			case kCustomAuto:
 				// Put custom auto code here
 				break;
@@ -157,58 +116,51 @@ public class Robot extends IterativeRobot {
 				// Put default auto code here
 				break;
 		}
-		*/
-		speedUp += 0.01;
-		SmartDashboard.putNumber("speedUp Timer", speedUp);
-		SmartDashboard.updateValues();
-		
 	}
 
 	/**
 	 * This function is called periodically during operator control.
 	 */
-	
-		
 	@Override
 	public void teleopPeriodic() {
+		rSpeed = controller.getY(hand.kRight);
+		trMotor.set(rSpeed);
+		brMotor.set(rSpeed);
 		
-		SparkR.set(BumperOpen.getX(left.kLeft));
-		SparkL.set(BumperOpen.getX(left.kLeft));
-		VictorR.set(BumperOpen.getX(left.kRight));
-		VictorL.set(BumperOpen.getX(left.kRight));
-		Solenoid0.set(BumperOpen.getBumper(left.kLeft));
-		Solenoid1.set(!(BumperOpen.getBumper(left.kLeft)));
-		Solenoid2.set(BumperOpen.getBumper(left.kRight));
-		Solenoid3.set(!(BumperOpen.getBumper(left.kRight)));
-		SmartDashboard.putNumber("Controller speed", BumperOpen.getX(left.kLeft));
+		lSpeed = controller.getY(hand.kLeft);
+		tlMotor.set(lSpeed);
+		blMotor.set(lSpeed);
+		
+		if(controller.getBumper(hand.kRight)) {
+			arm.set(0.25);
+		}else {
+			arm.set(0);
+		}
+		
+		clawOpen.set(controller.getBumper(hand.kLeft));
+		clawClose.set(!(controller.getBumper(hand.kLeft)));
+		
+		if(controller.getBumper(hand.kLeft)) {
+			controller.setRumble(RumbleType.kLeftRumble, 1);
+			controller.setRumble(RumbleType.kRightRumble, 1);
+		}else {
+			controller.setRumble(RumbleType.kLeftRumble, 0);
+			controller.setRumble(RumbleType.kRightRumble, 0);
+		}
+		
+		if(stick.getTrigger()) {
+			rWinch.set(1.0);
+			lWinch.set(1.0);
+		}else {
+			rWinch.set(0);
+			lWinch.set(0);
+		}
 	}
-	
-//	@Override
-	public void diabledPeriodic() {
-		SparkR.set(0);
-		SparkL.set(0);
-		VictorR.set(0);
-		VictorL.set(0);
-		Solenoid0.set(false);
-		Solenoid1.set(true);
-		SmartDashboard.putString("DB/String 0"," testing ");
-		timer.stop();
-		timer.reset();
-		speedUp=0;
-		SmartDashboard.updateValues();
-	}
-	
-	
+
 	/**
 	 * This function is called periodically during test mode.
 	 */
 	@Override
 	public void testPeriodic() {
-		SparkR.set(1.0);
-		SparkL.set(-1.0);
-		VictorR.set(1.0);
-		VictorL.set(-1.0);
-		Solenoid0.set(true);
-		Solenoid1.set(false);
 	}
 }
