@@ -56,6 +56,8 @@ public class Robot extends IterativeRobot {
 	private Hand hand;
 	private static XboxController controller;
 	private Joystick stick;
+	private int counterClaw;
+	private int counterPush;
 	
 	/**
 	 * This function is run when the robot is first started up and should be
@@ -81,6 +83,8 @@ public class Robot extends IterativeRobot {
 		
 		stick = new Joystick(0);
 		controller = new XboxController(0);
+		counterClaw = 1;
+		counterPush = 1;
 	}
 
 	/**
@@ -123,38 +127,62 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void teleopPeriodic() {
-		rSpeed = controller.getY(hand.kRight);
-		trMotor.set(rSpeed);
-		brMotor.set(rSpeed);
 		
 		lSpeed = controller.getY(hand.kLeft);
-		tlMotor.set(lSpeed);
-		blMotor.set(lSpeed);
+		trMotor.set(lSpeed * -1);
+		brMotor.set(lSpeed* -1);
 		
-		if(controller.getBumper(hand.kRight)) {
-			arm.set(0.25);
-		}else {
-			arm.set(0);
-		}
 		
-		clawOpen.set(controller.getBumper(hand.kLeft));
-		clawClose.set(!(controller.getBumper(hand.kLeft)));
+		rSpeed = controller.getY(hand.kRight);
+		tlMotor.set(rSpeed);
+		blMotor.set(rSpeed);
+//		if(controller.getBumper(hand.kRight)) {
+//			arm.set(0.25);
+//		}else {
+//			arm.set(0);
+//		}
+//		
+//		if(controller.getBumper(hand.kLeft)) {
+			clawOpen.set(controller.getBumper(hand.kLeft));
+			clawClose.set(!(controller.getBumper(hand.kLeft)));
+			
+			scissorOpen.set(controller.getBumper(hand.kRight));
+			scissorClose.set(!(controller.getBumper(hand.kRight)));
+//			counterClaw++;
+//		}else {
+//			clawOpen.set(false);
+//			clawClose.set(true);
+//			counterClaw++;
+//		}
 		
-		if(controller.getBumper(hand.kLeft)) {
-			controller.setRumble(RumbleType.kLeftRumble, 1);
-			controller.setRumble(RumbleType.kRightRumble, 1);
-		}else {
-			controller.setRumble(RumbleType.kLeftRumble, 0);
-			controller.setRumble(RumbleType.kRightRumble, 0);
-		}
+//		if(counterPush%2 !=0 && controller.getBumper(hand.kRight)) {
+//			clawOpen.set(true);
+//			clawClose.set(false);
+//			counterPush++;
+//		}else {
+//			clawOpen.set(false);
+//			clawClose.set(true);
+//			counterPush++;
+//		}
 		
-		if(stick.getTrigger()) {
-			rWinch.set(1.0);
-			lWinch.set(1.0);
-		}else {
-			rWinch.set(0);
-			lWinch.set(0);
-		}
+		
+		
+//		
+//		if(controller.getBumper(hand.kLeft)) {
+//			controller.setRumble(RumbleType.kLeftRumble, 1);
+//			controller.setRumble(RumbleType.kRightRumble, 1);
+//		}else {
+//			controller.setRumble(RumbleType.kLeftRumble, 0);
+//			controller.setRumble(RumbleType.kRightRumble, 0);
+//		}
+//		
+//		if(stick.getTrigger()) {
+//			rWinch.set(1.0);
+//			lWinch.set(1.0);
+//		}else {
+//			rWinch.set(0);
+//			lWinch.set(0);
+//		}
 	}
 
 	/**
