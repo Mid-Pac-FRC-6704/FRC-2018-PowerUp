@@ -35,30 +35,31 @@ public class Robot extends IterativeRobot {
 	private SendableChooser<String> m_chooser = new SendableChooser<>();
 
 	public Timer timer;
-	
+
 	private Spark trMotor; //Top Right Drive Motor
 	private Spark tlMotor; //Top Left Drive Motor
 	private Spark brMotor; //Bottom Right Drive Motor
 	private Spark blMotor; //Bottom Left Drive Motor
-	
+
 	private double rSpeed;
 	private double lSpeed;
-	
+
 	private Victor arm; //Arm Motor
 	private Victor rWinch; //Right Winch Motor
 	private Victor lWinch; //Left Winch Motor
-	
+
 	private Solenoid clawOpen; //Solenoid for opening claw
 	private Solenoid clawClose; //Solenoid for closing claw
 	private Solenoid scissorOpen; //Solenoid for opening scissor lift
 	private Solenoid scissorClose; //Solenoid for closing scissor lift
-	
+
 	private Hand hand;
 	private static XboxController controller;
 	private Joystick stick;
 	private int counterClaw;
 	private int counterPush;
-	
+	private boolean isClosed;
+
 	/**
 	 * This function is run when the robot is first started up and should be
 	 * used for any initialization code.
@@ -68,23 +69,24 @@ public class Robot extends IterativeRobot {
 		m_chooser.addDefault("Default Auto", kDefaultAuto);
 		m_chooser.addObject("My Auto", kCustomAuto);
 		SmartDashboard.putData("Auto choices", m_chooser);
-		
+
 		timer = new Timer();
-		
+
 		trMotor = new Spark(0);
 		tlMotor = new Spark(1);
 		brMotor = new Spark(2);
 		blMotor = new Spark(3);
-		
+
 		clawOpen = new Solenoid(0);
 		clawClose = new Solenoid(1);
 		scissorOpen = new Solenoid(2);
 		scissorClose = new Solenoid(3);
-		
+
 		stick = new Joystick(0);
 		controller = new XboxController(0);
 		counterClaw = 1;
 		counterPush = 1;
+		isClosed = true;
 	}
 
 	/**
@@ -127,12 +129,12 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void teleopPeriodic() {
-		
+
 		lSpeed = controller.getY(hand.kLeft);
 		trMotor.set(lSpeed * -1);
 		brMotor.set(lSpeed* -1);
-		
-		
+
+
 		rSpeed = controller.getY(hand.kRight);
 		tlMotor.set(rSpeed);
 		blMotor.set(rSpeed);
@@ -141,33 +143,36 @@ public class Robot extends IterativeRobot {
 //		}else {
 //			arm.set(0);
 //		}
-//		
-//		if(controller.getBumper(hand.kLeft)) {
-			clawOpen.set(controller.getBumper(hand.kLeft));
-			clawClose.set(!(controller.getBumper(hand.kLeft)));
-			
-			scissorOpen.set(controller.getBumper(hand.kRight));
-			scissorClose.set(!(controller.getBumper(hand.kRight)));
-//			counterClaw++;
-//		}else {
-//			clawOpen.set(false);
-//			clawClose.set(true);
-//			counterClaw++;
-//		}
-		
-//		if(counterPush%2 !=0 && controller.getBumper(hand.kRight)) {
-//			clawOpen.set(true);
-//			clawClose.set(false);
-//			counterPush++;
-//		}else {
-//			clawOpen.set(false);
-//			clawClose.set(true);
-//			counterPush++;
-//		}
-		
-		
-		
-//		
+//
+
+// 		Should be able to set the thing to open once
+		if(controller.getBumper(hand.kLeft) && isClosed){
+			// clawOpen.set
+			scissorClose.set(false);
+			// clawClose.set
+			scissorClose.set(true);
+			isClosed = false;
+		}
+
+		if(controller.getBumper(hand.kRight) && !(isClosed)){
+			// clawOpen.set
+			scissorOpen.set(true);
+			// clawClose.set
+			scissorClose.set(false);
+			isClosed = true;
+		}
+
+
+		// clawOpen.set(controller.getBumper(hand.kLeft));
+		// clawClose.set(!(controller.getBumper(hand.kLeft)));
+
+		// scissorOpen.set
+		clawClose.set(controller.getXButton());
+		clawClose.set(!(controller.getXButton()));
+
+
+
+//
 //		if(controller.getBumper(hand.kLeft)) {
 //			controller.setRumble(RumbleType.kLeftRumble, 1);
 //			controller.setRumble(RumbleType.kRightRumble, 1);
@@ -175,7 +180,7 @@ public class Robot extends IterativeRobot {
 //			controller.setRumble(RumbleType.kLeftRumble, 0);
 //			controller.setRumble(RumbleType.kRightRumble, 0);
 //		}
-//		
+//
 //		if(stick.getTrigger()) {
 //			rWinch.set(1.0);
 //			lWinch.set(1.0);
