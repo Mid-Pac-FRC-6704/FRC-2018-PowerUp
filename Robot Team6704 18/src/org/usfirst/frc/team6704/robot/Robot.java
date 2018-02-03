@@ -10,10 +10,16 @@ package org.usfirst.frc.team6704.robot;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Timer;
 
-import edu.wpi.first.wpilibj.smartdashboard.*;
+import edu.wpi.first.wpilibj.SendableBase;
+import edu.wpi.first.wpilibj.SpeedControllerGroup;
+import edu.wpi.first.wpilibj.drive.RobotDriveBase;
+import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 
+import edu.wpi.first.wpilibj.smartdashboard.*;
+import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.GenericHID.*;
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.buttons.*;
 
 import edu.wpi.first.wpilibj.Spark;
 import edu.wpi.first.wpilibj.Victor;
@@ -35,31 +41,43 @@ public class Robot extends IterativeRobot {
 	private SendableChooser<String> m_chooser = new SendableChooser<>();
 
 	public Timer timer;
-
+	
 	private Spark trMotor; //Top Right Drive Motor
 	private Spark tlMotor; //Top Left Drive Motor
 	private Spark brMotor; //Bottom Right Drive Motor
 	private Spark blMotor; //Bottom Left Drive Motor
-
+	
+	private SpeedControllerGroup mLeft;
+	private SpeedControllerGroup mRight;
+	private DifferentialDrive drive;
+	
 	private double rSpeed;
 	private double lSpeed;
-
+	
 	private Victor arm; //Arm Motor
 	private Victor rWinch; //Right Winch Motor
 	private Victor lWinch; //Left Winch Motor
-
+	
+	private boolean scissor;
+	
 	private Solenoid clawOpen; //Solenoid for opening claw
 	private Solenoid clawClose; //Solenoid for closing claw
+	private Solenoid pusherOpen;
+	private Solenoid pusherClose;
 	private Solenoid scissorOpen; //Solenoid for opening scissor lift
 	private Solenoid scissorClose; //Solenoid for closing scissor lift
-
+	
 	private Hand hand;
 	private static XboxController controller;
 	private Joystick stick;
 	private int counterClaw;
 	private int counterPush;
 	private boolean isClosed;
-
+	private DigitalInput limitOne;
+	private DigitalInput limitTwo;
+	private int clawSeq;
+	private boolean toBePushed;
+	
 	/**
 	 * This function is run when the robot is first started up and should be
 	 * used for any initialization code.
@@ -69,24 +87,42 @@ public class Robot extends IterativeRobot {
 		m_chooser.addDefault("Default Auto", kDefaultAuto);
 		m_chooser.addObject("My Auto", kCustomAuto);
 		SmartDashboard.putData("Auto choices", m_chooser);
-
+		
 		timer = new Timer();
-
+		
 		trMotor = new Spark(0);
-		tlMotor = new Spark(1);
 		brMotor = new Spark(2);
+		mRight = new SpeedControllerGroup(trMotor, brMotor);
+
+		tlMotor = new Spark(1);
 		blMotor = new Spark(3);
+		mLeft = new SpeedControllerGroup(tlMotor, blMotor);
+		
+		arm = new Victor(4);
+		
+		drive = new DifferentialDrive(mLeft, mRight);
 
 		clawOpen = new Solenoid(0);
 		clawClose = new Solenoid(1);
-		scissorOpen = new Solenoid(2);
-		scissorClose = new Solenoid(3);
-
+		pusherOpen = new Solenoid(2);
+		pusherClose = new Solenoid(3);
+		scissorOpen = new Solenoid(4);
+		scissorClose = new Solenoid(5);
+		
+		limitOne = new DigitalInput(0);
+		limitTwo = new DigitalInput(1);
+		
 		stick = new Joystick(0);
 		controller = new XboxController(0);
 		counterClaw = 1;
 		counterPush = 1;
 		isClosed = true;
+		scissor = false;
+		toBePushed = false;
+		clawSeq = 1;
+		
+		scissorOpen.set(true);
+		scissorClose.set(false);
 	}
 
 	/**
@@ -128,59 +164,73 @@ public class Robot extends IterativeRobot {
 	 * This function is called periodically during operator control.
 	 */
 	@Override
+	public void teleopInit() {
+		scissorOpen.set(true);
+		scissorClose.set(false);
+		pusherOpen.set(false);
+		pusherClose.set(true);
+		clawOpen.set(false);
+		clawClose.set(true);
+	}
+	
+	@Override
 	public void teleopPeriodic() {
-
+		
+		
 		lSpeed = controller.getY(hand.kLeft);
-		trMotor.set(lSpeed * -1);
-		brMotor.set(lSpeed* -1);
 
-
+		
 		rSpeed = controller.getY(hand.kRight);
-		tlMotor.set(rSpeed);
-		blMotor.set(rSpeed);
-//		if(controller.getBumper(hand.kRight)) {
-//			arm.set(0.25);
-//		}else {
-//			arm.set(0);
-//		}
-//
+		
+		drive.tankDrive(lSpeed, rSpeed);
 
-// 		Should be able to set the thing to open once
-		if(controller.getBumper(hand.kLeft) && isClosed){
-			// clawOpen.set
-			scissorClose.set(false);
-			// clawClose.set
-			scissorClose.set(true);
+		if( limitOne.get() && limitTwo.get() && !(isClosed) && !(toBePushed)){
+			clawOpen.set(false);
+			clawClose.set(true);
+			isClosed = false;
+			toBePushed = true;
+			clawSeq = 0;
+		}
+
+		if(controller.getBumper(hand.kRight) && isClosed){
+			clawOpen.set(true);
+			clawClose.set(false);
 			isClosed = false;
 		}
 
-		if(controller.getBumper(hand.kRight) && !(isClosed)){
-			// clawOpen.set
-			scissorOpen.set(true);
-			// clawClose.set
-			scissorClose.set(false);
-			isClosed = true;
+		SmartDashboard.putBoolean("IS CLOSED", isClosed);
+		SmartDashboard.putBoolean("To be pushed", toBePushed);
+		
+		if(controller.getBumper(hand.kLeft)&& toBePushed) {
+
+//			case 0:
+				clawOpen.set(true);
+				clawClose.set(false);
+//				clawSeq = 1;
+//				break;
+		switch(clawSeq) {
+			case 1:
+				pusherOpen.set(true);
+				pusherClose.set(false);
+				clawSeq =2;
+//				break;
+			case 2:
+				pusherOpen.set(false);
+				pusherClose.set(true);
+				clawSeq = 1;
+			}
+		
+			toBePushed = false;
 		}
+		
+		
+		if(controller.getBButtonPressed()) {
+			scissorOpen.set(false);
+			scissorClose.set(true);
+		}
+		
 
-
-		// clawOpen.set(controller.getBumper(hand.kLeft));
-		// clawClose.set(!(controller.getBumper(hand.kLeft)));
-
-		// scissorOpen.set
-		clawClose.set(controller.getXButton());
-		clawClose.set(!(controller.getXButton()));
-
-
-
-//
-//		if(controller.getBumper(hand.kLeft)) {
-//			controller.setRumble(RumbleType.kLeftRumble, 1);
-//			controller.setRumble(RumbleType.kRightRumble, 1);
-//		}else {
-//			controller.setRumble(RumbleType.kLeftRumble, 0);
-//			controller.setRumble(RumbleType.kRightRumble, 0);
-//		}
-//
+//		
 //		if(stick.getTrigger()) {
 //			rWinch.set(1.0);
 //			lWinch.set(1.0);
@@ -188,6 +238,21 @@ public class Robot extends IterativeRobot {
 //			rWinch.set(0);
 //			lWinch.set(0);
 //		}
+		SmartDashboard.putBoolean("LimitSwitchLeft", limitOne.get());
+		SmartDashboard.putBoolean("LimitSwitchRight", limitTwo.get());
+		
+		
+		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
+			SmartDashboard.putNumber("ArmL",controller.getTriggerAxis(hand.kLeft));
+			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
+		}
+		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
+			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
+			arm.set(controller.getTriggerAxis(hand.kRight ));
+		}
+			
+			SmartDashboard.updateValues();
+		
 	}
 
 	/**
@@ -195,5 +260,16 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void testPeriodic() {
+		if(controller.getBButtonPressed() && !(scissor)) {
+			scissorOpen.set(true);
+			scissorClose.set(false);
+			scissor = true;
+		}
+		
+		if(controller.getXButtonPressed() && scissor) {
+			scissorOpen.set(false);
+			scissorClose.set(true);
+			scissor = false;
+		}
 	}
 }
