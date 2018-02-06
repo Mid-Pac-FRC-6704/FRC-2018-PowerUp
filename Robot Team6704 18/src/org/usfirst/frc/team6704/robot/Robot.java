@@ -214,64 +214,76 @@ public class Robot extends IterativeRobot {
 		lSpeed = controller.getY(hand.kLeft);
 		rSpeed = controller.getY(hand.kRight);
 		
-		drive.tankDrive(lSpeed, rSpeed);
+		drive.tankDrive(rSpeed,lSpeed);
 		SmartDashboard.putData("Tank Drive", drive);
 		SmartDashboard.putNumber("Right Distance", rEncoder.get());
 		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
 //		&& isClosed && !(toBePushed)
-		if( limitOne.get() && limitTwo.get()&& !(isClosed)){
-			clawOpen.set(false);
-			clawClose.set(true);
-			isClosed = true;
-			toBePushed = true;
-			clawSeq = 0;
-		}
-
+		
 		if(controller.getBumper(hand.kRight) && isClosed){
 			clawOpen.set(true);
 			clawClose.set(false);
 			isClosed = false;
 		}
-
-		SmartDashboard.putBoolean("IS CLOSED", isClosed);
-		SmartDashboard.putBoolean("To be pushed", toBePushed);
-		
-		if(controller.getBumper(hand.kLeft)&& toBePushed) {
-			clawSeq = 1;
-			toBePushed = false;
-			isClosed = false;
-		}
-		
-		if(controller.getStartButton()||controller.getBackButton()) {
+		if(controller.getBumper(hand.kLeft) && !(isClosed)){
 			clawOpen.set(false);
 			clawClose.set(true);
-			isClosed =true;
-			
+			isClosed = true;
 		}
-		SmartDashboard.putNumber("claw seq", clawSeq);
-		switch(clawSeq) {
-		case 1:
-			clawOpen.set(true);
-			clawClose.set(false);
-			clawSeq =2;
-			break;
-		case 2:
-			pusherOpen.set(true);
-			pusherClose.set(false);
-			clawSeq = 3;
-			break;
-		case 3:
-			pusherOpen.set(false);
-			pusherClose.set(true);
-			clawSeq = 10;
-			break;
-		}
-		
-		if(controller.getBButton()) {
-			scissorOpen.set(false);
-			scissorClose.set(true);
-		}
-		
+//////////////// KALANI"S STUFF/////////////////
+//		if( limitOne.get() && limitTwo.get()&& !(isClosed)){
+//			clawOpen.set(false);
+//			clawClose.set(true);
+//			isClosed = true;
+//			toBePushed = true;
+//			clawSeq = 0;
+//		}
+//
+//		if(controller.getBumper(hand.kRight) && isClosed){
+//			clawOpen.set(true);
+//			clawClose.set(false);
+//			isClosed = false;
+//		}
+//
+//		SmartDashboard.putBoolean("IS CLOSED", isClosed);
+//		SmartDashboard.putBoolean("To be pushed", toBePushed);
+//		
+//		if(controller.getBumper(hand.kLeft)&& toBePushed) {
+//			clawSeq = 1;
+//			toBePushed = false;
+//			isClosed = false;
+//		}
+//		
+//		if(controller.getStartButton()||controller.getBackButton()) {
+//			clawOpen.set(false);
+//			clawClose.set(true);
+//			isClosed =true;
+//			
+//		}
+//		SmartDashboard.putNumber("claw seq", clawSeq);
+//		switch(clawSeq) {
+//		case 1:
+//			clawOpen.set(true);
+//			clawClose.set(false);
+//			clawSeq =2;
+//			break;
+//		case 2:
+//			pusherOpen.set(true);
+//			pusherClose.set(false);
+//			clawSeq = 3;
+//			break;
+//		case 3:
+//			pusherOpen.set(false);
+//			pusherClose.set(true);
+//			clawSeq = 10;
+//			break;
+//		}
+//		
+//		if(controller.getBButton()) {
+//			scissorOpen.set(false);
+//			scissorClose.set(true);
+//		}
+//////////////////////////////////////////////
 		
 //		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
 //			rWinch.set(controller.getTriggerAxis(hand.kLeft)); //Right Winch Motor
@@ -293,14 +305,14 @@ public class Robot extends IterativeRobot {
 		SmartDashboard.putBoolean("LimitSwitchRight", limitTwo.get());
 		
 		
-//		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
-//			SmartDashboard.putNumber("ArmL",controller.getTriggerAxis(hand.kLeft));
+		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
+			SmartDashboard.putNumber("ArmL",controller.getTriggerAxis(hand.kLeft));
+			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
+		}
+		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
 //			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
-//		}
-//		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
-//			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
-//			arm.set(controller.getTriggerAxis(hand.kRight ));
-//		}
+			arm.set(controller.getTriggerAxis(hand.kRight ));
+		}
 			
 			SmartDashboard.updateValues();
 		
