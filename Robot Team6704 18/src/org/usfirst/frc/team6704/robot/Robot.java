@@ -10,10 +10,21 @@ package org.usfirst.frc.team6704.robot;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Timer;
 
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
+
+import edu.wpi.first.wpilibj.CameraServer;
+import edu.wpi.cscore.CvSink;
+import edu.wpi.cscore.CvSource;
+import edu.wpi.cscore.UsbCamera;
+
 import edu.wpi.first.wpilibj.SendableBase;
 import edu.wpi.first.wpilibj.SpeedControllerGroup;
 import edu.wpi.first.wpilibj.drive.RobotDriveBase;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+
+import edu.wpi.first.wpilibj.SensorBase;
+import edu.wpi.first.wpilibj.Encoder;
 
 import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj.DigitalInput;
@@ -50,6 +61,9 @@ public class Robot extends IterativeRobot {
 	private SpeedControllerGroup mLeft;
 	private SpeedControllerGroup mRight;
 	private DifferentialDrive drive;
+	
+	private Encoder rEncoder;
+	private Encoder lEncoder;
 	
 	private double rSpeed;
 	private double lSpeed;
@@ -88,6 +102,14 @@ public class Robot extends IterativeRobot {
 		m_chooser.addObject("My Auto", kCustomAuto);
 		SmartDashboard.putData("Auto choices", m_chooser);
 		
+		new Thread(() -> {
+            UsbCamera usbCam = CameraServer.getInstance().startAutomaticCapture();
+            usbCam.setResolution(640, 480);
+            //Kinect class -> not done yet. Will get too it.
+            //Kinect kinect = new Kinect();
+        }).start();
+		
+		
 		timer = new Timer();
 		
 		trMotor = new Spark(0);
@@ -98,9 +120,16 @@ public class Robot extends IterativeRobot {
 		blMotor = new Spark(3);
 		mLeft = new SpeedControllerGroup(tlMotor, blMotor);
 		
-		arm = new Victor(4);
-		
 		drive = new DifferentialDrive(mLeft, mRight);
+		
+		rEncoder = new Encoder(2, 3, false, Encoder.EncodingType.k4X);
+		lEncoder = new Encoder(4, 5, false, Encoder.EncodingType.k4X);
+		//Still need to dial in encoder settings and reverse left or right encoder (forgot which one)
+		//2048 pulses per revolution
+				
+		arm = new Victor(4);
+		rWinch= new Victor(5); //Right Winch Motor
+		lWinch=new Victor(6);
 
 		clawOpen = new Solenoid(0);
 		clawClose = new Solenoid(1);
@@ -108,6 +137,8 @@ public class Robot extends IterativeRobot {
 		pusherClose = new Solenoid(3);
 		scissorOpen = new Solenoid(4);
 		scissorClose = new Solenoid(5);
+		
+		
 		
 		limitOne = new DigitalInput(0);
 		limitTwo = new DigitalInput(1);
@@ -122,7 +153,7 @@ public class Robot extends IterativeRobot {
 		clawSeq = 1;
 		
 		scissorOpen.set(true);
-		scissorClose.set(false);
+		scissorClose.set(false);	
 	}
 
 	/**
@@ -171,6 +202,9 @@ public class Robot extends IterativeRobot {
 		pusherClose.set(true);
 		clawOpen.set(false);
 		clawClose.set(true);
+		isClosed = true;
+		scissor = false;
+		toBePushed = false;
 	}
 	
 	@Override
@@ -178,16 +212,17 @@ public class Robot extends IterativeRobot {
 		
 		
 		lSpeed = controller.getY(hand.kLeft);
-
-		
 		rSpeed = controller.getY(hand.kRight);
 		
 		drive.tankDrive(lSpeed, rSpeed);
-
-		if( limitOne.get() && limitTwo.get() && !(isClosed) && !(toBePushed)){
+		SmartDashboard.putData("Tank Drive", drive);
+		SmartDashboard.putNumber("Right Distance", rEncoder.get());
+		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
+//		&& isClosed && !(toBePushed)
+		if( limitOne.get() && limitTwo.get()&& !(isClosed)){
 			clawOpen.set(false);
 			clawClose.set(true);
-			isClosed = false;
+			isClosed = true;
 			toBePushed = true;
 			clawSeq = 0;
 		}
@@ -202,34 +237,50 @@ public class Robot extends IterativeRobot {
 		SmartDashboard.putBoolean("To be pushed", toBePushed);
 		
 		if(controller.getBumper(hand.kLeft)&& toBePushed) {
-
-//			case 0:
-				clawOpen.set(true);
-				clawClose.set(false);
-//				clawSeq = 1;
-//				break;
-		switch(clawSeq) {
-			case 1:
-				pusherOpen.set(true);
-				pusherClose.set(false);
-				clawSeq =2;
-//				break;
-			case 2:
-				pusherOpen.set(false);
-				pusherClose.set(true);
-				clawSeq = 1;
-			}
-		
+			clawSeq = 1;
 			toBePushed = false;
+			isClosed = false;
 		}
 		
+		if(controller.getStartButton()||controller.getBackButton()) {
+			clawOpen.set(false);
+			clawClose.set(true);
+			isClosed =true;
+			
+		}
+		SmartDashboard.putNumber("claw seq", clawSeq);
+		switch(clawSeq) {
+		case 1:
+			clawOpen.set(true);
+			clawClose.set(false);
+			clawSeq =2;
+			break;
+		case 2:
+			pusherOpen.set(true);
+			pusherClose.set(false);
+			clawSeq = 3;
+			break;
+		case 3:
+			pusherOpen.set(false);
+			pusherClose.set(true);
+			clawSeq = 10;
+			break;
+		}
 		
-		if(controller.getBButtonPressed()) {
+		if(controller.getBButton()) {
 			scissorOpen.set(false);
 			scissorClose.set(true);
 		}
 		
-
+		
+//		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
+//			rWinch.set(controller.getTriggerAxis(hand.kLeft)); //Right Winch Motor
+//			lWinch.set(controller.getTriggerAxis(hand.kLeft));
+//		}
+//		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
+//			rWinch.set(controller.getTriggerAxis(hand.kRight)*-1); //Right Winch Motor
+//			lWinch.set(controller.getTriggerAxis(hand.kRight)*-1);
+//		}
 //		
 //		if(stick.getTrigger()) {
 //			rWinch.set(1.0);
@@ -242,14 +293,14 @@ public class Robot extends IterativeRobot {
 		SmartDashboard.putBoolean("LimitSwitchRight", limitTwo.get());
 		
 		
-		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
-			SmartDashboard.putNumber("ArmL",controller.getTriggerAxis(hand.kLeft));
-			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
-		}
-		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
-			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
-			arm.set(controller.getTriggerAxis(hand.kRight ));
-		}
+//		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
+//			SmartDashboard.putNumber("ArmL",controller.getTriggerAxis(hand.kLeft));
+//			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
+//		}
+//		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
+//			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
+//			arm.set(controller.getTriggerAxis(hand.kRight ));
+//		}
 			
 			SmartDashboard.updateValues();
 		
