@@ -89,6 +89,7 @@ public class Robot extends IterativeRobot {
 	private DigitalInput limitTwo;
 	private int clawSeq;
 	private boolean toBePushed;
+	private Timer timed;
 
 	/**
 	 * This function is run when the robot is first started up and should be
@@ -109,6 +110,7 @@ public class Robot extends IterativeRobot {
 
 
 		timer = new Timer();
+		timed = new Timer();
 
 		trMotor = new Spark(0);
 		brMotor = new Spark(2);
@@ -192,6 +194,8 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void teleopInit() {
+		timed.stop();
+		timed.reset();
 		scissorOpen.set(true);
 		scissorClose.set(false);
 		pusherOpen.set(false);
@@ -215,19 +219,7 @@ public class Robot extends IterativeRobot {
 		SmartDashboard.putData("Tank Drive", drive);
 		SmartDashboard.putNumber("Right Distance", rEncoder.get());
 		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
-//		&& isClosed && !(toBePushed)
 
-		// if(controller.getBumper(hand.kRight) && isClosed){
-		// 	clawOpen.set(true);
-		// 	clawClose.set(false);
-		// 	isClosed = false;
-		// }
-		// if(controller.getBumper(hand.kLeft) && !(isClosed)){
-		// 	clawOpen.set(false);
-		// 	clawClose.set(true);
-		// 	isClosed = true;
-		// }
-////////////// KALANI"S STUFF/////////////////
 		if( limitOne.get() && limitTwo.get()&& !(isClosed)){
 			clawOpen.set(false);
 			clawClose.set(true);
@@ -246,64 +238,30 @@ public class Robot extends IterativeRobot {
 		SmartDashboard.putBoolean("To be pushed", toBePushed);
 
 		if(controller.getBumper(hand.kLeft)&& toBePushed) {
-			clawSeq = 1;
+//			clawSeq = 1;
+			timed.reset();
+			timed.start();
 			toBePushed = false;
-			isClosed = false;
+			isClosed = true;
 		}
 
-		if(controller.getStartButton()||controller.getBackButton()) {
+		if(controller.getStartButton()) {
 			clawOpen.set(false);
 			clawClose.set(true);
-			isClosed =true;
+			isClosed = true;
+			scissor = false;
+			toBePushed = false;
+//
+		}
 
-		}
 		SmartDashboard.putNumber("claw seq", clawSeq);
-		switch(clawSeq) {
-		case 1:
-			clawOpen.set(true);
-			clawClose.set(false);
-			clawSeq =2;
-			break;
-		case 2:
-			pusherOpen.set(true);
-			pusherClose.set(false);
-			clawSeq = 3;
-			break;
-		case 3:
-			clawSeq = 4;
-			break;
-		case 4:
-			clawSeq = 5;
-			break;
-		case 5:
-			pusherOpen.set(false);
-			pusherClose.set(true);
-			clawSeq = 10;
-			break;
-		}
+		
 
 		if(controller.getBButton()) {
 			scissorOpen.set(false);
 			scissorClose.set(true);
 		}
-////////////////////////////////////////////
 
-//		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
-//			rWinch.set(controller.getTriggerAxis(hand.kLeft)); //Right Winch Motor
-//			lWinch.set(controller.getTriggerAxis(hand.kLeft));
-//		}
-//		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
-//			rWinch.set(controller.getTriggerAxis(hand.kRight)*-1); //Right Winch Motor
-//			lWinch.set(controller.getTriggerAxis(hand.kRight)*-1);
-//		}
-//
-//		if(stick.getTrigger()) {
-//			rWinch.set(1.0);
-//			lWinch.set(1.0);
-//		}else {
-//			rWinch.set(0);
-//			lWinch.set(0);
-//		}
 		SmartDashboard.putBoolean("LimitSwitchLeft", limitOne.get());
 		SmartDashboard.putBoolean("LimitSwitchRight", limitTwo.get());
 
@@ -324,6 +282,11 @@ public class Robot extends IterativeRobot {
 	/**
 	 * This function is called periodically during test mode.
 	 */
+	@Override
+	public void testInit() {
+		timed.stop();
+		timed.reset();
+	}
 	 @Override
  	public void testPeriodic() {
 
@@ -344,8 +307,8 @@ public class Robot extends IterativeRobot {
  			scissor = false;
  		}
 
- 		pusherOpen.set(controller.getYButton());
- 		pusherClose.set(!(controller.getYButton()));
+// 		pusherOpen.set(controller.getYButton());
+// 		pusherClose.set(!(controller.getYButton()));
 
  		if(controller.getBumper(hand.kRight) && isClosed){
  			clawOpen.set(true);
@@ -358,6 +321,22 @@ public class Robot extends IterativeRobot {
  			isClosed = true;
  		}
 
+ 		
+ 		if(controller.getStartButton()) {
+ 			rWinch.set(1.0);
+ 			lWinch.set(1.0);
+ 		}else {
+ 			rWinch.set(0);
+ 			lWinch.set(0);
+ 		}
+ 		
+ 		if(controller.getBackButton()) {
+ 			rWinch.set(-1.0);
+ 			lWinch.set(-1.0);
+ 		}else {
+ 			rWinch.set(0);
+ 			lWinch.set(0);
+ 		}
  		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
  			SmartDashboard.putNumber("ArmL",controller.getTriggerAxis(hand.kLeft));
  			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
@@ -366,5 +345,118 @@ public class Robot extends IterativeRobot {
  			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
  			arm.set(controller.getTriggerAxis(hand.kRight ));
  		}
+ 		
+ 		if(controller.getYButton()) {
+ 			timed.start();
+ 		}
+ 		clawSeq = (int)timed.get();
+ 		SmartDashboard.putNumber("Timer values", clawSeq);
+ 		
+ 		switch(clawSeq) {
+ 		case 1:
+ 			SmartDashboard.putBoolean("Here i am", true);
+ 			break;
+ 		case 2:
+ 			SmartDashboard.putBoolean("Here i am", false);
+ 			break;
+ 		case 3:
+ 			SmartDashboard.putBoolean("Here i am", true);
+ 			break;
+ 		}
+ 		
  	}
+	 
+	 public int punching(int Seq) {
+		 int ThisSeq = Seq; 
+			switch(ThisSeq) {
+			case 1:
+				clawOpen.set(true);
+				clawClose.set(false);
+				ThisSeq = 2;
+				break;
+			case 2:
+				ThisSeq = 3;
+				break;
+			case 3:
+				ThisSeq = 4;
+				break;
+			case 4:
+				ThisSeq = 5;
+				break;
+			case 5:
+				ThisSeq = 6;
+				break;
+			case 6:
+				pusherOpen.set(true);
+				pusherClose.set(false);
+				ThisSeq = 7;
+				break;
+			case 7:
+				ThisSeq = 8;
+				break;
+			case 8:
+				ThisSeq = 9;
+				break;
+			case 9:
+				ThisSeq = 10;
+				break;
+			case 10:
+				ThisSeq = 11;
+				break;
+			case 11:
+				pusherOpen.set(false);
+				pusherClose.set(true);
+				ThisSeq = 12;
+				break;
+			case 12:
+				ThisSeq = 13;
+				break;
+			case 13:
+				isClosed = true;
+				ThisSeq = 14;
+				break;
+			case 14:
+				ThisSeq = 15;
+				break;
+			case 15:
+				ThisSeq = 16;
+				break;
+			case 16:
+				ThisSeq = 17;
+				break;
+			case 17:
+				ThisSeq = 18;
+				break;
+			case 18:
+				ThisSeq = 19;
+				break;
+			case 19:
+				ThisSeq = 21;
+				break;
+			case 21:
+				ThisSeq = 22;
+				break;
+			case 22:
+				ThisSeq = 23;
+				break;
+			case 23:
+				ThisSeq = 24;
+				break;
+			case 24:
+				ThisSeq = 25;
+				break;
+			case 25:
+				ThisSeq = 26;
+				break;
+			case 26:
+				ThisSeq = 27;
+				break;
+			case 27:
+				isClosed = false;
+				ThisSeq = 0;
+				break;
+			}
+			return 0;
+
+	 }
 }
