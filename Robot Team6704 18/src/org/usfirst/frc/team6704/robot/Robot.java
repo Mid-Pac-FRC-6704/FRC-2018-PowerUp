@@ -28,6 +28,7 @@ import edu.wpi.first.wpilibj.Encoder;
 
 import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.GenericHID.*;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.buttons.*;
@@ -50,8 +51,6 @@ public class Robot extends IterativeRobot {
 	private static final String kCustomAuto = "My Auto";
 	private String m_autoSelected;
 	private SendableChooser<String> m_chooser = new SendableChooser<>();
-
-	public Timer timer;
 
 	private Spark trMotor; //Top Right Drive Motor
 	private Spark tlMotor; //Top Left Drive Motor
@@ -90,7 +89,8 @@ public class Robot extends IterativeRobot {
 	private int clawSeq;
 	private boolean toBePushed;
 	private Timer timed;
-
+	private String AutoChoose;
+	private String gameFieldData;
 	/**
 	 * This function is run when the robot is first started up and should be
 	 * used for any initialization code.
@@ -108,28 +108,26 @@ public class Robot extends IterativeRobot {
             //Kinect kinect = new Kinect();
         }).start();
 
-
-		timer = new Timer();
 		timed = new Timer();
 
-		trMotor = new Spark(0);
-		brMotor = new Spark(2);
-		mRight = new SpeedControllerGroup(trMotor, brMotor);
+		trMotor = new Spark(0); //Top right motor
+		brMotor = new Spark(2); //Back right motor
+		mRight = new SpeedControllerGroup(trMotor, brMotor); //Matches values for right speed controllers
 
-		tlMotor = new Spark(1);
-		blMotor = new Spark(3);
-		mLeft = new SpeedControllerGroup(tlMotor, blMotor);
+		tlMotor = new Spark(1); //Top left motor
+		blMotor = new Spark(3); //Back left motor
+		mLeft = new SpeedControllerGroup(tlMotor, blMotor); //Matches values for left speed controllers
 
-		drive = new DifferentialDrive(mLeft, mRight);
+		drive = new DifferentialDrive(mLeft, mRight); //Tank drive object
 
-		rEncoder = new Encoder(2, 3, false, Encoder.EncodingType.k4X);
-		lEncoder = new Encoder(4, 5, false, Encoder.EncodingType.k4X);
+		rEncoder = new Encoder(2, 3, false, Encoder.EncodingType.k4X); //Right encoder
+		lEncoder = new Encoder(4, 5, false, Encoder.EncodingType.k4X); //Left encoder
 		//Still need to dial in encoder settings and reverse left or right encoder (forgot which one)
 		//2048 pulses per revolution
 
-		arm = new Victor(4);
-		rWinch= new Victor(5); //Right Winch Motor
-		lWinch=new Victor(6);
+		arm = new Victor(4); //Arm motor
+		rWinch= new Victor(5); //Right winch motor
+		lWinch=new Victor(6); //Left winch motor
 
 		clawOpen = new Solenoid(0);
 		clawClose = new Solenoid(1);
@@ -137,8 +135,6 @@ public class Robot extends IterativeRobot {
 		pusherClose = new Solenoid(3);
 		scissorOpen = new Solenoid(4);
 		scissorClose = new Solenoid(5);
-
-
 
 		limitOne = new DigitalInput(0);
 		limitTwo = new DigitalInput(1);
@@ -150,6 +146,8 @@ public class Robot extends IterativeRobot {
 		toBePushed = false;
 		clawSeq = 0;
 
+		gameFieldData = "";
+		
 		scissorOpen.set(true);
 		scissorClose.set(false);
 	}
@@ -167,10 +165,17 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void autonomousInit() {
-		m_autoSelected = m_chooser.getSelected();
-		// autoSelected = SmartDashboard.getString("Auto Selector",
-		// defaultAuto);
-		System.out.println("Auto selected: " + m_autoSelected);
+		if(stick.getTrigger()) {
+			AutoChoose = "Middle";
+		}
+		if(stick.getRawButton(3)) {
+			AutoChoose = "Left";
+		}
+		if(stick.getRawButton(4)) {
+			AutoChoose = "Right";
+		}
+		SmartDashboard.putString("Autonomous Selecting", AutoChoose);
+		SmartDashboard.updateValues();
 	}
 
 	/**
@@ -178,14 +183,30 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void autonomousPeriodic() {
-		switch (m_autoSelected) {
-			case kCustomAuto:
-				// Put custom auto code here
+		gameFieldData = DriverStation.getInstance().getGameSpecificMessage();
+		switch (AutoChoose) {
+			case "Left":
+				if(gameFieldData.charAt(0) == 'L') {
+					//Auto Code
+				}else {
+					//Auto Code
+				}
 				break;
-			case kDefaultAuto:
-			default:
-				// Put default auto code here
+			case "Right":
+				if(gameFieldData.charAt(0) == 'L') {
+					//Auto Code
+				}else {
+					//Auto Code
+				}
 				break;
+			case "Middle":
+				if(gameFieldData.charAt(0) == 'L') {
+					//Auto Code
+				}else {
+					//Auto Code
+				}
+				break;
+			
 		}
 	}
 
@@ -241,8 +262,8 @@ public class Robot extends IterativeRobot {
 //			clawSeq = 1;
 			timed.reset();
 			timed.start();
-			toBePushed = false;
-			isClosed = true;
+//			toBePushed = false;
+//			isClosed = true;
 		}
 
 		if(controller.getStartButton()) {
@@ -253,9 +274,29 @@ public class Robot extends IterativeRobot {
 			toBePushed = false;
 //
 		}
-
-		SmartDashboard.putNumber("claw seq", clawSeq);
 		
+		clawSeq = (int)timed.get();
+		SmartDashboard.putNumber("claw seq", clawSeq);
+		switch(clawSeq) {
+			case 1:
+				clawOpen.set(false);
+				clawClose.set(true);
+				break;
+			
+			case 2:
+				pusherOpen.set(true);
+				pusherClose.set(false);
+				break;
+			case 3:
+				pusherOpen.set(false);
+				pusherClose.set(true);
+				break;
+			case 4:
+				toBePushed = false;
+				isClosed = true;
+				timed.stop();
+				break;
+		}
 
 		if(controller.getBButton()) {
 			scissorOpen.set(false);
@@ -293,7 +334,7 @@ public class Robot extends IterativeRobot {
  		lSpeed = controller.getY(hand.kLeft);
  		rSpeed = controller.getY(hand.kRight);
 
- 		drive.tankDrive(rSpeed,lSpeed);
+ 		//drive.tankDrive(rSpeed,lSpeed);
 
  		if(controller.getBButtonPressed() && !(scissor)) {
  			scissorOpen.set(true);
@@ -307,8 +348,6 @@ public class Robot extends IterativeRobot {
  			scissor = false;
  		}
 
-// 		pusherOpen.set(controller.getYButton());
-// 		pusherClose.set(!(controller.getYButton()));
 
  		if(controller.getBumper(hand.kRight) && isClosed){
  			clawOpen.set(true);
@@ -321,30 +360,49 @@ public class Robot extends IterativeRobot {
  			isClosed = true;
  		}
 
+ 		SmartDashboard.putBoolean("Start Button", controller.getStartButton());
+// 		if(controller.getStartButton()) {
+// 			rWinch.set(1.0);
+// 			lWinch.set(1.0);
+// 		}else {
+// 			rWinch.set(0);
+// 			lWinch.set(0);
+// 		}
  		
- 		if(controller.getStartButton()) {
+ 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+// 		if(controller.getBackButton()) {
+// 			rWinch.set(-1.0);
+// 			lWinch.set(-1.0);
+// 		}else {
+// 			rWinch.set(0);
+// 			lWinch.set(0);
+// 		}
+ 		/*
+ 		if(controller.getYButton()) {
  			rWinch.set(1.0);
- 			lWinch.set(1.0);
- 		}else {
- 			rWinch.set(0);
- 			lWinch.set(0);
- 		}
- 		
- 		if(controller.getBackButton()) {
- 			rWinch.set(-1.0);
  			lWinch.set(-1.0);
  		}else {
  			rWinch.set(0);
  			lWinch.set(0);
  		}
- 		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
- 			SmartDashboard.putNumber("ArmL",controller.getTriggerAxis(hand.kLeft));
- 			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
+ 		*/
+ 		/*
+ 		if(controller.getTriggerAxis(hand.kLeft)>= 0.05 && controller.getTriggerAxis(hand.kRight) <= 0.05) {
+// 			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
+// 			arm.set(controller.getTriggerAxis(hand.kRight ));
+ 			rWinch.set(controller.getTriggerAxis(hand.kLeft));
+ 			lWinch.set(controller.getTriggerAxis(hand.kLeft)*-1);
+ 		}else if(controller.getTriggerAxis(hand.kLeft)<= 0.05 && controller.getTriggerAxis(hand.kRight)>= 0.05){
+ 			rWinch.set(controller.getTriggerAxis(hand.kRight)*-1.0);
+ 			lWinch.set(controller.getTriggerAxis(hand.kRight));
+ 		}else {
+ 			rWinch.set(0);
+ 			lWinch.set(0);
  		}
- 		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
- 			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
- 			arm.set(controller.getTriggerAxis(hand.kRight ));
- 		}
+ 		*/
+ 		
+ 		rWinch.set(controller.getY(hand.kLeft));
+ 		lWinch.set(controller.getY(hand.kRight));
  		
  		if(controller.getYButton()) {
  			timed.start();
@@ -365,7 +423,8 @@ public class Robot extends IterativeRobot {
  		}
  		
  	}
-	 
+
+	 /*
 	 public int punching(int Seq) {
 		 int ThisSeq = Seq; 
 			switch(ThisSeq) {
@@ -459,4 +518,5 @@ public class Robot extends IterativeRobot {
 			return 0;
 
 	 }
+	 */
 }
