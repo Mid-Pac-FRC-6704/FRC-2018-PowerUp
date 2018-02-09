@@ -139,7 +139,7 @@ public class Robot extends IterativeRobot {
 		limitOne = new DigitalInput(0);
 		limitTwo = new DigitalInput(1);
 
-		stick = new Joystick(0);
+		stick = new Joystick(1);
 		controller = new XboxController(0);
 		isClosed = true;
 		scissor = false;
@@ -150,6 +150,7 @@ public class Robot extends IterativeRobot {
 		
 		scissorOpen.set(true);
 		scissorClose.set(false);
+		AutoChoose = "";
 	}
 
 	/**
@@ -163,8 +164,9 @@ public class Robot extends IterativeRobot {
 	 * the switch structure below with additional strings. If using the
 	 * SendableChooser make sure to add them to the chooser code above as well.
 	 */
+	
 	@Override
-	public void autonomousInit() {
+	public void disabledPeriodic() {
 		if(stick.getTrigger()) {
 			AutoChoose = "Middle";
 		}
@@ -175,7 +177,23 @@ public class Robot extends IterativeRobot {
 			AutoChoose = "Right";
 		}
 		SmartDashboard.putString("Autonomous Selecting", AutoChoose);
+		if(controller.getBackButton()) {
+			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+ 		}else if(controller.getStartButton()) {
+ 			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+ 		}
+ 		else {
+ 			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+ 		}
 		SmartDashboard.updateValues();
+	}
+	@Override
+	public void autonomousInit() {
+		lEncoder.reset();
+		rEncoder.reset();
 	}
 
 	/**
@@ -184,26 +202,66 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void autonomousPeriodic() {
 		gameFieldData = DriverStation.getInstance().getGameSpecificMessage();
+		SmartDashboard.putNumber("Right Distance", rEncoder.get());
+		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
 		switch (AutoChoose) {
 			case "Left":
 				if(gameFieldData.charAt(0) == 'L') {
-					//Auto Code
+					if(lEncoder.getRaw() >= -10000 || rEncoder.getRaw()>= -10000) {
+						mRight.set(0.6);
+						mLeft.set(0.6);
+					}
+					else {
+						mRight.set(0);
+						mLeft.set(0);
+					}
 				}else {
-					//Auto Code
+					if(lEncoder.getRaw() >= -10000 && rEncoder.getRaw()>= -10000) {
+						mRight.set(1);
+						mLeft.set(1);
+					}else {
+						mRight.set(0);
+						mLeft.set(0);
+					}
 				}
 				break;
 			case "Right":
 				if(gameFieldData.charAt(0) == 'L') {
-					//Auto Code
+					if(lEncoder.getRaw() >= -10000 && rEncoder.getRaw()>= -10000) {
+						mRight.set(1);
+						mLeft.set(1);
+					}else {
+						mRight.set(0);
+						mLeft.set(0);
+					}
+					
 				}else {
-					//Auto Code
+					if(lEncoder.getRaw() >= -10000 && rEncoder.getRaw()>= -10000) {
+						mRight.set(1);
+						mLeft.set(1);
+					}else {
+						mRight.set(0);
+						mLeft.set(0);
+					}
 				}
 				break;
 			case "Middle":
 				if(gameFieldData.charAt(0) == 'L') {
-					//Auto Code
+					if(rEncoder.getRaw() >= -10000) {
+						mRight.set(0.7);
+						mLeft.set(-0.7);
+					}else {
+						mRight.set(0);
+						mLeft.set(0);
+					}
 				}else {
-					//Auto Code
+//					if(lEncoder.getRaw() <= 1000 && rEncoder.getRaw()<= 1000) {
+//						mRight.set(0.7);
+//						mLeft.set(-0.7);
+//					}else {
+//						mRight.set(0);
+//						mLeft.set(0);
+//					}
 				}
 				break;
 			
@@ -257,9 +315,11 @@ public class Robot extends IterativeRobot {
 
 		SmartDashboard.putBoolean("IS CLOSED", isClosed);
 		SmartDashboard.putBoolean("To be pushed", toBePushed);
+		SmartDashboard.putBoolean("Start Button", controller.getStartButton());
+ 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
 
 		if(controller.getBumper(hand.kLeft)&& toBePushed) {
-//			clawSeq = 1;
+			clawSeq = 0;
 			timed.reset();
 			timed.start();
 //			toBePushed = false;
@@ -274,26 +334,28 @@ public class Robot extends IterativeRobot {
 			toBePushed = false;
 //
 		}
+		if(controller.getBackButton()) {
+			isClosed = true;
+
+		}
 		
 		clawSeq = (int)timed.get();
 		SmartDashboard.putNumber("claw seq", clawSeq);
 		switch(clawSeq) {
-			case 1:
-				clawOpen.set(false);
-				clawClose.set(true);
-				break;
-			
-			case 2:
+			case 0:
+				clawOpen.set(true);
+				clawClose.set(false);
 				pusherOpen.set(true);
 				pusherClose.set(false);
 				break;
-			case 3:
+			
+			case 1:
 				pusherOpen.set(false);
 				pusherClose.set(true);
 				break;
-			case 4:
+			case 2:
 				toBePushed = false;
-				isClosed = true;
+				isClosed = false;
 				timed.stop();
 				break;
 		}
@@ -327,6 +389,19 @@ public class Robot extends IterativeRobot {
 	public void testInit() {
 		timed.stop();
 		timed.reset();
+		if(controller.getBackButton()) {
+			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+ 		}else if(controller.getStartButton()) {
+ 			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+ 		}
+ 		else {
+ 			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+ 		}
+		SmartDashboard.updateValues();
+		
 	}
 	 @Override
  	public void testPeriodic() {
@@ -334,7 +409,7 @@ public class Robot extends IterativeRobot {
  		lSpeed = controller.getY(hand.kLeft);
  		rSpeed = controller.getY(hand.kRight);
 
- 		//drive.tankDrive(rSpeed,lSpeed);
+ 		drive.tankDrive(rSpeed,lSpeed);
 
  		if(controller.getBButtonPressed() && !(scissor)) {
  			scissorOpen.set(true);
@@ -370,6 +445,18 @@ public class Robot extends IterativeRobot {
 // 		}
  		
  		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+ 		
+ 		if(controller.getBackButton()) {
+// 			rWinch.set(1.0);
+// 			lWinch.set(-1.0);
+ 		}else if(controller.getStartButton()) {
+ 			rWinch.set(-1.0);
+ 			lWinch.set(1.0);
+ 		}
+ 		else {
+ 			rWinch.set(0);
+ 			lWinch.set(0);
+ 		}
 // 		if(controller.getBackButton()) {
 // 			rWinch.set(-1.0);
 // 			lWinch.set(-1.0);
@@ -401,8 +488,8 @@ public class Robot extends IterativeRobot {
  		}
  		*/
  		
- 		rWinch.set(controller.getY(hand.kLeft));
- 		lWinch.set(controller.getY(hand.kRight));
+// 		rWinch.set(controller.getY(hand.kLeft));
+// 		lWinch.set(controller.getY(hand.kRight));
  		
  		if(controller.getYButton()) {
  			timed.start();
