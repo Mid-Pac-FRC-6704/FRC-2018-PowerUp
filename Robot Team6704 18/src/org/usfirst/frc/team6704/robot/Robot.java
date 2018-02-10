@@ -120,7 +120,7 @@ public class Robot extends IterativeRobot {
 
 		drive = new DifferentialDrive(mLeft, mRight); //Tank drive object
 
-		rEncoder = new Encoder(2, 3, false, Encoder.EncodingType.k4X); //Right encoder
+		rEncoder = new Encoder(2, 3, true, Encoder.EncodingType.k4X); //Right encoder
 		lEncoder = new Encoder(4, 5, false, Encoder.EncodingType.k4X); //Left encoder
 		//Still need to dial in encoder settings and reverse left or right encoder (forgot which one)
 		//2048 pulses per revolution
@@ -166,6 +166,24 @@ public class Robot extends IterativeRobot {
 	 */
 	
 	@Override
+	public void disabledInit() {
+		timed.stop();
+		timed.reset();
+		lEncoder.reset();
+		rEncoder.reset();
+		scissorOpen.set(true);
+		scissorClose.set(false);
+		pusherOpen.set(false);
+		pusherClose.set(true);
+		clawOpen.set(false);
+		clawClose.set(true);
+		isClosed = true;
+		scissor = false;
+		toBePushed = false;
+		clawSeq = 0;
+	}
+	
+	@Override
 	public void disabledPeriodic() {
 		if(stick.getTrigger()) {
 			AutoChoose = "Middle";
@@ -194,6 +212,16 @@ public class Robot extends IterativeRobot {
 	public void autonomousInit() {
 		lEncoder.reset();
 		rEncoder.reset();
+		scissorOpen.set(true);
+		scissorClose.set(false);
+		pusherOpen.set(false);
+		pusherClose.set(true);
+		clawOpen.set(false);
+		clawClose.set(true);
+		isClosed = true;
+		scissor = false;
+		toBePushed = false;
+		clawSeq = 0;
 	}
 
 	/**
@@ -207,7 +235,7 @@ public class Robot extends IterativeRobot {
 		switch (AutoChoose) {
 			case "Left":
 				if(gameFieldData.charAt(0) == 'L') {
-					if(lEncoder.getRaw() >= -10000 || rEncoder.getRaw()>= -10000) {
+					if(lEncoder.getRaw() <= 1000 || rEncoder.getRaw() >= -1000) {
 						mRight.set(0.6);
 						mLeft.set(0.6);
 					}
@@ -216,18 +244,12 @@ public class Robot extends IterativeRobot {
 						mLeft.set(0);
 					}
 				}else {
-					if(lEncoder.getRaw() >= -10000 && rEncoder.getRaw()>= -10000) {
-						mRight.set(1);
-						mLeft.set(1);
-					}else {
-						mRight.set(0);
-						mLeft.set(0);
-					}
+					
 				}
 				break;
 			case "Right":
 				if(gameFieldData.charAt(0) == 'L') {
-					if(lEncoder.getRaw() >= -10000 && rEncoder.getRaw()>= -10000) {
+					if(lEncoder.getRaw() <= 1000 || rEncoder.getRaw()>= -1000) {
 						mRight.set(1);
 						mLeft.set(1);
 					}else {
@@ -236,7 +258,7 @@ public class Robot extends IterativeRobot {
 					}
 					
 				}else {
-					if(lEncoder.getRaw() >= -10000 && rEncoder.getRaw()>= -10000) {
+					if(lEncoder.getRaw() <= -1000 || rEncoder.getRaw()>= -10000) {
 						mRight.set(1);
 						mLeft.set(1);
 					}else {
@@ -247,25 +269,35 @@ public class Robot extends IterativeRobot {
 				break;
 			case "Middle":
 				if(gameFieldData.charAt(0) == 'L') {
-					if(rEncoder.getRaw() >= -10000) {
-						mRight.set(0.7);
-						mLeft.set(-0.7);
+					if(rEncoder.get() < 5000) {
+						mRight.set(0.35);
+						mLeft.set(-0.35);
+						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
+					}else if(rEncoder.get() > 5000) {
+						mRight.set(0);
+						mLeft.set(0);
+						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
+					}
+				}else {
+					if(rEncoder.get() < 5000) {
+						mRight.set(0.35);
+						mLeft.set(-0.35);
+						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
+					}else if(rEncoder.get() > 5000) {
+						mRight.set(0);
+						mLeft.set(0);
+						AutoChoose = "";
+						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
 					}else {
 						mRight.set(0);
 						mLeft.set(0);
 					}
-				}else {
-//					if(lEncoder.getRaw() <= 1000 && rEncoder.getRaw()<= 1000) {
-//						mRight.set(0.7);
-//						mLeft.set(-0.7);
-//					}else {
-//						mRight.set(0);
-//						mLeft.set(0);
-//					}
+
 				}
 				break;
 			
 		}
+		SmartDashboard.updateValues();
 	}
 
 	/**
@@ -322,8 +354,6 @@ public class Robot extends IterativeRobot {
 			clawSeq = 0;
 			timed.reset();
 			timed.start();
-//			toBePushed = false;
-//			isClosed = true;
 		}
 
 		if(controller.getStartButton()) {
@@ -374,7 +404,6 @@ public class Robot extends IterativeRobot {
 			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
 		}
 		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
-//			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
 			arm.set(controller.getTriggerAxis(hand.kRight ));
 		}
 
@@ -436,174 +465,54 @@ public class Robot extends IterativeRobot {
  		}
 
  		SmartDashboard.putBoolean("Start Button", controller.getStartButton());
-// 		if(controller.getStartButton()) {
-// 			rWinch.set(1.0);
-// 			lWinch.set(1.0);
-// 		}else {
-// 			rWinch.set(0);
-// 			lWinch.set(0);
-// 		}
- 		
  		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
  		
- 		if(controller.getBackButton()) {
-// 			rWinch.set(1.0);
-// 			lWinch.set(-1.0);
- 		}else if(controller.getStartButton()) {
- 			rWinch.set(-1.0);
- 			lWinch.set(1.0);
- 		}
- 		else {
- 			rWinch.set(0);
+ 		if(stick.getRawButton(3)) {
+ 			lWinch.set(-1);
+ 		}else {
  			lWinch.set(0);
  		}
+ 		
+ 		if(stick.getRawButton(4)) {
+ 			rWinch.set(1);
+ 		}else {
+ 			rWinch.set(0);
+ 		}
 // 		if(controller.getBackButton()) {
-// 			rWinch.set(-1.0);
+// 			rWinch.set(1.0);
 // 			lWinch.set(-1.0);
-// 		}else {
+// 		}else if(controller.getStartButton()) {
+// 			rWinch.set(-1.0);
+// 			lWinch.set(1.0);
+// 		}
+// 		else {
 // 			rWinch.set(0);
 // 			lWinch.set(0);
 // 		}
- 		/*
- 		if(controller.getYButton()) {
- 			rWinch.set(1.0);
- 			lWinch.set(-1.0);
- 		}else {
- 			rWinch.set(0);
- 			lWinch.set(0);
- 		}
- 		*/
- 		/*
- 		if(controller.getTriggerAxis(hand.kLeft)>= 0.05 && controller.getTriggerAxis(hand.kRight) <= 0.05) {
-// 			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
-// 			arm.set(controller.getTriggerAxis(hand.kRight ));
- 			rWinch.set(controller.getTriggerAxis(hand.kLeft));
- 			lWinch.set(controller.getTriggerAxis(hand.kLeft)*-1);
- 		}else if(controller.getTriggerAxis(hand.kLeft)<= 0.05 && controller.getTriggerAxis(hand.kRight)>= 0.05){
- 			rWinch.set(controller.getTriggerAxis(hand.kRight)*-1.0);
- 			lWinch.set(controller.getTriggerAxis(hand.kRight));
- 		}else {
- 			rWinch.set(0);
- 			lWinch.set(0);
- 		}
- 		*/
- 		
-// 		rWinch.set(controller.getY(hand.kLeft));
-// 		lWinch.set(controller.getY(hand.kRight));
  		
  		if(controller.getYButton()) {
  			timed.start();
  		}
- 		clawSeq = (int)timed.get();
- 		SmartDashboard.putNumber("Timer values", clawSeq);
  		
- 		switch(clawSeq) {
- 		case 1:
+ 		if(lEncoder.get()< 2000) {
  			SmartDashboard.putBoolean("Here i am", true);
- 			break;
- 		case 2:
- 			SmartDashboard.putBoolean("Here i am", false);
- 			break;
- 		case 3:
- 			SmartDashboard.putBoolean("Here i am", true);
- 			break;
+ 		} else {
+			SmartDashboard.putBoolean("Here i am", false);
  		}
+// 		clawSeq = (int)timed.get();
+// 		SmartDashboard.putNumber("Timer values", clawSeq);
+// 		
+// 		switch(clawSeq) {
+// 		case 1:
+// 			SmartDashboard.putBoolean("Here i am", true);
+// 			break;
+// 		case 2:
+// 			SmartDashboard.putBoolean("Here i am", false);
+// 			break;
+// 		case 3:
+// 			SmartDashboard.putBoolean("Here i am", true);
+// 			break;
+// 		}
  		
  	}
-
-	 /*
-	 public int punching(int Seq) {
-		 int ThisSeq = Seq; 
-			switch(ThisSeq) {
-			case 1:
-				clawOpen.set(true);
-				clawClose.set(false);
-				ThisSeq = 2;
-				break;
-			case 2:
-				ThisSeq = 3;
-				break;
-			case 3:
-				ThisSeq = 4;
-				break;
-			case 4:
-				ThisSeq = 5;
-				break;
-			case 5:
-				ThisSeq = 6;
-				break;
-			case 6:
-				pusherOpen.set(true);
-				pusherClose.set(false);
-				ThisSeq = 7;
-				break;
-			case 7:
-				ThisSeq = 8;
-				break;
-			case 8:
-				ThisSeq = 9;
-				break;
-			case 9:
-				ThisSeq = 10;
-				break;
-			case 10:
-				ThisSeq = 11;
-				break;
-			case 11:
-				pusherOpen.set(false);
-				pusherClose.set(true);
-				ThisSeq = 12;
-				break;
-			case 12:
-				ThisSeq = 13;
-				break;
-			case 13:
-				isClosed = true;
-				ThisSeq = 14;
-				break;
-			case 14:
-				ThisSeq = 15;
-				break;
-			case 15:
-				ThisSeq = 16;
-				break;
-			case 16:
-				ThisSeq = 17;
-				break;
-			case 17:
-				ThisSeq = 18;
-				break;
-			case 18:
-				ThisSeq = 19;
-				break;
-			case 19:
-				ThisSeq = 21;
-				break;
-			case 21:
-				ThisSeq = 22;
-				break;
-			case 22:
-				ThisSeq = 23;
-				break;
-			case 23:
-				ThisSeq = 24;
-				break;
-			case 24:
-				ThisSeq = 25;
-				break;
-			case 25:
-				ThisSeq = 26;
-				break;
-			case 26:
-				ThisSeq = 27;
-				break;
-			case 27:
-				isClosed = false;
-				ThisSeq = 0;
-				break;
-			}
-			return 0;
-
-	 }
-	 */
 }
