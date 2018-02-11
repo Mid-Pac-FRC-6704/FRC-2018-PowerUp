@@ -26,6 +26,9 @@ import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.SensorBase;
 import edu.wpi.first.wpilibj.Encoder;
 
+import edu.wpi.first.wpilibj.PIDController;
+import edu.wpi.first.wpilibj.PIDOutput;
+import edu.wpi.first.wpilibj.PIDSourceType;
 import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -63,6 +66,13 @@ public class Robot extends IterativeRobot {
 
 	private Encoder rEncoder;
 	private Encoder lEncoder;
+	
+	private double kP = 0.00;
+	private double kI = 0.00;
+	private double kD = 0.00;
+	private double kF = 0.00;
+	private PIDController rDistanceController;
+	private PIDController lDistanceController;
 
 	private double rSpeed;
 	private double lSpeed;
@@ -121,9 +131,12 @@ public class Robot extends IterativeRobot {
 		drive = new DifferentialDrive(mLeft, mRight); //Tank drive object
 
 		rEncoder = new Encoder(2, 3, true, Encoder.EncodingType.k4X); //Right encoder
+		rEncoder.setDistancePerPulse(Math.PI/(4096)); //Sets distance in feet per pulse using 2048 pulses per revolution scale factor
+		rEncoder.setPIDSourceType(PIDSourceType.kDisplacement); //Sets PIDSource as displacement for PID loop
+		
 		lEncoder = new Encoder(4, 5, false, Encoder.EncodingType.k4X); //Left encoder
-		//Still need to dial in encoder settings and reverse left or right encoder (forgot which one)
-		//2048 pulses per revolution
+		lEncoder.setDistancePerPulse(Math.PI/(4096)); //Sets distance in feet per pulse using 2048 pulses  per revolution scale factor
+		lEncoder.setPIDSourceType(PIDSourceType.kDisplacement); //Sets PIDSource as displacement for PID loop
 
 		arm = new Victor(4); //Arm motor
 		rWinch= new Victor(5); //Right winch motor
@@ -222,6 +235,13 @@ public class Robot extends IterativeRobot {
 		scissor = false;
 		toBePushed = false;
 		clawSeq = 0;
+		
+		rEncoder.reset();
+		lEncoder.reset();
+		rDistanceController = new PIDController(kP, kI, kD, kF, rEncoder, mRight);
+		rDistanceController.setPercentTolerance(0.02);
+		lDistanceController = new PIDController(kP, kI, kD, kF, lEncoder, mLeft);
+		lDistanceController.setPercentTolerance(0.02);
 	}
 
 	/**
@@ -230,8 +250,19 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void autonomousPeriodic() {
 		gameFieldData = DriverStation.getInstance().getGameSpecificMessage();
-		SmartDashboard.putNumber("Right Distance", rEncoder.get());
-		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
+		SmartDashboard.putNumber("Right Distance", rEncoder.getDistance());
+		SmartDashboard.putNumber("Left Encoder", lEncoder.getDistance());
+		
+		rDistanceController.disable(); //Enable when ready. Disabled because of crash
+		lDistanceController.disable(); //Enable when ready. Disabled because of crash
+		//Change PID values in shuffleboard. DO NOT GO ABOVE 0.1 ON ANY VALUE
+		rDistanceController.setSetpoint(1);
+		lDistanceController.setSetpoint(1);
+		SmartDashboard.putData("Right PID Loop", rDistanceController);
+		SmartDashboard.putData("Left PID Loop", lDistanceController);
+//		drive.tankDrive(rDistanceController.get(), lDistanceController.get()); //Use drive to operate robot because instance was already created in RobotInit
+		//Use encoder.getDistance instead of get raw. The values are set in feet, and the robot will over shoot if no PID algorithm is implemented
+		/*
 		switch (AutoChoose) {
 			case "Left":
 				if(gameFieldData.charAt(0) == 'L') {
@@ -297,6 +328,7 @@ public class Robot extends IterativeRobot {
 				break;
 			
 		}
+		*/
 		SmartDashboard.updateValues();
 	}
 
@@ -328,8 +360,8 @@ public class Robot extends IterativeRobot {
 
 		drive.tankDrive(rSpeed,lSpeed);
 		SmartDashboard.putData("Tank Drive", drive);
-		SmartDashboard.putNumber("Right Distance", rEncoder.get());
-		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
+		SmartDashboard.putNumber("Right Distance", rEncoder.getDistance());
+		SmartDashboard.putNumber("Left Encoder", lEncoder.getDistance());
 
 		if( limitOne.get() && limitTwo.get()&& !(isClosed)){
 			clawOpen.set(false);
@@ -410,6 +442,8 @@ public class Robot extends IterativeRobot {
 			SmartDashboard.updateValues();
 
 	}
+	
+	
 
 	/**
 	 * This function is called periodically during test mode.
@@ -430,10 +464,14 @@ public class Robot extends IterativeRobot {
 	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
  		}
 		SmartDashboard.updateValues();
-		
+	
 	}
+
+
+
 	 @Override
  	public void testPeriodic() {
+		 
 
  		lSpeed = controller.getY(hand.kLeft);
  		rSpeed = controller.getY(hand.kRight);
@@ -444,16 +482,17 @@ public class Robot extends IterativeRobot {
  			scissorOpen.set(true);
  			scissorClose.set(false);
  			scissor = true;
+ 			
  		}
 
  		if(controller.getXButtonPressed() && scissor) {
  			scissorOpen.set(false);
  			scissorClose.set(true);
  			scissor = false;
- 		}
+ 			
+	 }
 
-
- 		if(controller.getBumper(hand.kRight) && isClosed){
+ 		 if(controller.getBumper(hand.kRight) && isClosed){
  			clawOpen.set(true);
  			clawClose.set(false);
  			isClosed = false;
@@ -478,17 +517,6 @@ public class Robot extends IterativeRobot {
  		}else {
  			rWinch.set(0);
  		}
-// 		if(controller.getBackButton()) {
-// 			rWinch.set(1.0);
-// 			lWinch.set(-1.0);
-// 		}else if(controller.getStartButton()) {
-// 			rWinch.set(-1.0);
-// 			lWinch.set(1.0);
-// 		}
-// 		else {
-// 			rWinch.set(0);
-// 			lWinch.set(0);
-// 		}
  		
  		if(controller.getYButton()) {
  			timed.start();
@@ -499,20 +527,22 @@ public class Robot extends IterativeRobot {
  		} else {
 			SmartDashboard.putBoolean("Here i am", false);
  		}
-// 		clawSeq = (int)timed.get();
-// 		SmartDashboard.putNumber("Timer values", clawSeq);
-// 		
-// 		switch(clawSeq) {
-// 		case 1:
-// 			SmartDashboard.putBoolean("Here i am", true);
-// 			break;
-// 		case 2:
-// 			SmartDashboard.putBoolean("Here i am", false);
-// 			break;
-// 		case 3:
-// 			SmartDashboard.putBoolean("Here i am", true);
-// 			break;
-// 		}
  		
- 	}
-}
+	 
+ 	
+	 if (controller.getYButton()) {
+		
+		 pusherOpen.set(true);
+		 pusherClose.set(false);
+	 
+	  }else {
+		  
+		  pusherOpen.set(false);
+	 	  pusherClose.set(true);
+	 	  
+	  	}
+	 }
+  }
+	 
+  
+	 
