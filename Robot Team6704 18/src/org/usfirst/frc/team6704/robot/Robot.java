@@ -66,7 +66,7 @@ public class Robot extends IterativeRobot {
 
 	private Encoder rEncoder;
 	private Encoder lEncoder;
-	
+
 	private double kP = 0.00;
 	private double kI = 0.00;
 	private double kD = 0.00;
@@ -133,7 +133,7 @@ public class Robot extends IterativeRobot {
 		rEncoder = new Encoder(2, 3, true, Encoder.EncodingType.k4X); //Right encoder
 		rEncoder.setDistancePerPulse(Math.PI/(4096)); //Sets distance in feet per pulse using 2048 pulses per revolution scale factor
 		rEncoder.setPIDSourceType(PIDSourceType.kDisplacement); //Sets PIDSource as displacement for PID loop
-		
+
 		lEncoder = new Encoder(4, 5, false, Encoder.EncodingType.k4X); //Left encoder
 		lEncoder.setDistancePerPulse(Math.PI/(4096)); //Sets distance in feet per pulse using 2048 pulses  per revolution scale factor
 		lEncoder.setPIDSourceType(PIDSourceType.kDisplacement); //Sets PIDSource as displacement for PID loop
@@ -160,7 +160,7 @@ public class Robot extends IterativeRobot {
 		clawSeq = 0;
 
 		gameFieldData = "";
-		
+
 		scissorOpen.set(true);
 		scissorClose.set(false);
 		AutoChoose = "";
@@ -177,7 +177,7 @@ public class Robot extends IterativeRobot {
 	 * the switch structure below with additional strings. If using the
 	 * SendableChooser make sure to add them to the chooser code above as well.
 	 */
-	
+
 	@Override
 	public void disabledInit() {
 		timed.stop();
@@ -195,7 +195,7 @@ public class Robot extends IterativeRobot {
 		toBePushed = false;
 		clawSeq = 0;
 	}
-	
+
 	@Override
 	public void disabledPeriodic() {
 		if(stick.getTrigger()) {
@@ -235,7 +235,7 @@ public class Robot extends IterativeRobot {
 		scissor = false;
 		toBePushed = false;
 		clawSeq = 0;
-		
+
 		rEncoder.reset();
 		lEncoder.reset();
 		rDistanceController = new PIDController(kP, kI, kD, kF, rEncoder, mRight);
@@ -252,7 +252,7 @@ public class Robot extends IterativeRobot {
 		gameFieldData = DriverStation.getInstance().getGameSpecificMessage();
 		SmartDashboard.putNumber("Right Distance", rEncoder.getDistance());
 		SmartDashboard.putNumber("Left Encoder", lEncoder.getDistance());
-		
+
 		rDistanceController.disable(); //Enable when ready. Disabled because of crash
 		lDistanceController.disable(); //Enable when ready. Disabled because of crash
 		//Change PID values in shuffleboard. DO NOT GO ABOVE 0.1 ON ANY VALUE
@@ -262,52 +262,76 @@ public class Robot extends IterativeRobot {
 		SmartDashboard.putData("Left PID Loop", lDistanceController);
 //		drive.tankDrive(rDistanceController.get(), lDistanceController.get()); //Use drive to operate robot because instance was already created in RobotInit
 		//Use encoder.getDistance instead of get raw. The values are set in feet, and the robot will over shoot if no PID algorithm is implemented
-		/*
+		//Using encoder.get() is the same as encoder.getDistance but with it doesn't check since last time it was checked.
 		switch (AutoChoose) {
 			case "Left":
-				if(gameFieldData.charAt(0) == 'L') {
-					if(lEncoder.getRaw() <= 1000 || rEncoder.getRaw() >= -1000) {
-						mRight.set(0.6);
-						mLeft.set(0.6);
-					}
-					else {
-						mRight.set(0);
-						mLeft.set(0);
-					}
+			if(gameFieldData.charAt(0) == 'L') {
+				if(rEncoder.get() < 5000) {
+					mRight.set(0.35);
+					mLeft.set(-0.35);
+				}else if(rEncoder.get() > 5000) {
+					mRight.set(0);
+					mLeft.set(0);
+					AutoChoose = "";
 				}else {
-					
+					mRight.set(0);
+					mLeft.set(0);
 				}
+			}else {
+				if(rEncoder.get() < 5000) {
+					mRight.set(0.35);
+					mLeft.set(-0.35);
+				}else if(rEncoder.get() > 5000) {
+					mRight.set(0);
+					mLeft.set(0);
+					AutoChoose = "";
+				}else {
+					mRight.set(0);
+					mLeft.set(0);
+				}
+
+			}
 				break;
 			case "Right":
-				if(gameFieldData.charAt(0) == 'L') {
-					if(lEncoder.getRaw() <= 1000 || rEncoder.getRaw()>= -1000) {
-						mRight.set(1);
-						mLeft.set(1);
-					}else {
-						mRight.set(0);
-						mLeft.set(0);
-					}
-					
+			if(gameFieldData.charAt(0) == 'L') {
+				if(rEncoder.get() < 5000) {
+					mRight.set(0.35);
+					mLeft.set(-0.35);
+				}else if(rEncoder.get() > 5000) {
+					mRight.set(0);
+					mLeft.set(0);
+					AutoChoose = "";
 				}else {
-					if(lEncoder.getRaw() <= -1000 || rEncoder.getRaw()>= -10000) {
-						mRight.set(1);
-						mLeft.set(1);
-					}else {
-						mRight.set(0);
-						mLeft.set(0);
-					}
+					mRight.set(0);
+					mLeft.set(0);
 				}
+			}else {
+				if(rEncoder.get() < 5000) {
+					mRight.set(0.35);
+					mLeft.set(-0.35);
+				}else if(rEncoder.get() > 5000) {
+					mRight.set(0);
+					mLeft.set(0);
+					AutoChoose = "";
+				}else {
+					mRight.set(0);
+					mLeft.set(0);
+				}
+
+			}
 				break;
 			case "Middle":
 				if(gameFieldData.charAt(0) == 'L') {
 					if(rEncoder.get() < 5000) {
 						mRight.set(0.35);
 						mLeft.set(-0.35);
-						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
 					}else if(rEncoder.get() > 5000) {
 						mRight.set(0);
 						mLeft.set(0);
-						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
+						AutoChoose = "";
+					}else {
+						mRight.set(0);
+						mLeft.set(0);
 					}
 				}else {
 					if(rEncoder.get() < 5000) {
@@ -326,9 +350,8 @@ public class Robot extends IterativeRobot {
 
 				}
 				break;
-			
+
 		}
-		*/
 		SmartDashboard.updateValues();
 	}
 
@@ -400,7 +423,7 @@ public class Robot extends IterativeRobot {
 			isClosed = true;
 
 		}
-		
+
 		clawSeq = (int)timed.get();
 		SmartDashboard.putNumber("claw seq", clawSeq);
 		switch(clawSeq) {
@@ -410,7 +433,7 @@ public class Robot extends IterativeRobot {
 				pusherOpen.set(true);
 				pusherClose.set(false);
 				break;
-			
+
 			case 1:
 				pusherOpen.set(false);
 				pusherClose.set(true);
@@ -442,8 +465,8 @@ public class Robot extends IterativeRobot {
 			SmartDashboard.updateValues();
 
 	}
-	
-	
+
+
 
 	/**
 	 * This function is called periodically during test mode.
@@ -464,14 +487,14 @@ public class Robot extends IterativeRobot {
 	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
  		}
 		SmartDashboard.updateValues();
-	
+
 	}
 
 
 
 	 @Override
  	public void testPeriodic() {
-		 
+
 
  		lSpeed = controller.getY(hand.kLeft);
  		rSpeed = controller.getY(hand.kRight);
@@ -482,14 +505,14 @@ public class Robot extends IterativeRobot {
  			scissorOpen.set(true);
  			scissorClose.set(false);
  			scissor = true;
- 			
+
  		}
 
  		if(controller.getXButtonPressed() && scissor) {
  			scissorOpen.set(false);
  			scissorClose.set(true);
  			scissor = false;
- 			
+
 	 }
 
  		 if(controller.getBumper(hand.kRight) && isClosed){
@@ -505,44 +528,41 @@ public class Robot extends IterativeRobot {
 
  		SmartDashboard.putBoolean("Start Button", controller.getStartButton());
  		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
- 		
+
  		if(stick.getRawButton(3)) {
  			lWinch.set(-1);
  		}else {
  			lWinch.set(0);
  		}
- 		
+
  		if(stick.getRawButton(4)) {
  			rWinch.set(1);
  		}else {
  			rWinch.set(0);
  		}
- 		
+
  		if(controller.getYButton()) {
  			timed.start();
  		}
- 		
+
  		if(lEncoder.get()< 2000) {
  			SmartDashboard.putBoolean("Here i am", true);
  		} else {
 			SmartDashboard.putBoolean("Here i am", false);
  		}
- 		
-	 
- 	
+
+
+
 	 if (controller.getYButton()) {
-		
+
 		 pusherOpen.set(true);
 		 pusherClose.set(false);
-	 
+
 	  }else {
-		  
+
 		  pusherOpen.set(false);
 	 	  pusherClose.set(true);
-	 	  
+
 	  	}
 	 }
   }
-	 
-  
-	 
