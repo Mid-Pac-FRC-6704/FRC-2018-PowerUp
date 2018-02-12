@@ -13,6 +13,8 @@ import edu.wpi.first.wpilibj.Timer;
 import org.opencv.core.Mat;
 import org.opencv.imgproc.Imgproc;
 
+import com.kauailabs.navx.frc.AHRS;
+
 import edu.wpi.first.wpilibj.CameraServer;
 import edu.wpi.cscore.CvSink;
 import edu.wpi.cscore.CvSource;
@@ -28,6 +30,7 @@ import edu.wpi.first.wpilibj.Encoder;
 
 import edu.wpi.first.wpilibj.PIDController;
 import edu.wpi.first.wpilibj.PIDOutput;
+import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.PIDSourceType;
 import edu.wpi.first.wpilibj.smartdashboard.*;
 import edu.wpi.first.wpilibj.DigitalInput;
@@ -49,7 +52,8 @@ import edu.wpi.first.wpilibj.Solenoid;
  * creating this project, you must also update the build.properties file in the
  * project.
  */
-public class Robot extends IterativeRobot {
+public class Robot extends IterativeRobot implements PIDOutput {
+	
 	private static final String kDefaultAuto = "Default";
 	private static final String kCustomAuto = "My Auto";
 	private String m_autoSelected;
@@ -66,7 +70,7 @@ public class Robot extends IterativeRobot {
 
 	private Encoder rEncoder;
 	private Encoder lEncoder;
-
+	
 	private double kP = 0.00;
 	private double kI = 0.00;
 	private double kD = 0.00;
@@ -100,7 +104,15 @@ public class Robot extends IterativeRobot {
 	private boolean toBePushed;
 	private Timer timed;
 	private String AutoChoose;
+	private String turning;
 	private String gameFieldData;
+	
+	AHRS ahrs;
+
+    PIDController turnController;
+    double rotateToAngleRate;
+	final double kToleranceDegrees = 2.0f;    
+	final double kTargetAngleDegrees = 90.0f;
 	/**
 	 * This function is run when the robot is first started up and should be
 	 * used for any initialization code.
@@ -110,6 +122,37 @@ public class Robot extends IterativeRobot {
 		m_chooser.addDefault("Default Auto", kDefaultAuto);
 		m_chooser.addObject("My Auto", kCustomAuto);
 		SmartDashboard.putData("Auto choices", m_chooser);
+		
+		rotateToAngleRate = 0;
+		
+		
+		   try {
+				/***********************************************************************
+				 * navX-MXP:
+				 * - Communication via RoboRIO MXP (SPI, I2C, TTL UART) and USB.            
+				 * - See http://navx-mxp.kauailabs.com/guidance/selecting-an-interface.
+				 * 
+				 * navX-Micro:
+				 * - Communication via I2C (RoboRIO MXP or Onboard) and USB.
+				 * - See http://navx-micro.kauailabs.com/guidance/selecting-an-interface.
+				 * 
+				 * Multiple navX-model devices on a single robot are supported.
+				 ************************************************************************/
+	            ahrs = new AHRS(SPI.Port.kMXP); 
+	        } catch (RuntimeException ex ) {
+	            DriverStation.reportError("Error instantiating navX MXP:  " + ex.getMessage(), true);
+	        }
+		
+		turnController = new PIDController(kP, kI, kD, kF, ahrs,this);
+		turnController.setInputRange(-180.0f,180.0f);
+		turnController.setOutputRange(-1.0,1.0);
+		turnController.setAbsoluteTolerance(kToleranceDegrees);
+		turnController.setContinuous(true);
+		turnController.disable();
+		
+		
+		
+		
 
 		new Thread(() -> {
             UsbCamera usbCam = CameraServer.getInstance().startAutomaticCapture();
@@ -133,7 +176,7 @@ public class Robot extends IterativeRobot {
 		rEncoder = new Encoder(2, 3, true, Encoder.EncodingType.k4X); //Right encoder
 		rEncoder.setDistancePerPulse(Math.PI/(4096)); //Sets distance in feet per pulse using 2048 pulses per revolution scale factor
 		rEncoder.setPIDSourceType(PIDSourceType.kDisplacement); //Sets PIDSource as displacement for PID loop
-
+		
 		lEncoder = new Encoder(4, 5, false, Encoder.EncodingType.k4X); //Left encoder
 		lEncoder.setDistancePerPulse(Math.PI/(4096)); //Sets distance in feet per pulse using 2048 pulses  per revolution scale factor
 		lEncoder.setPIDSourceType(PIDSourceType.kDisplacement); //Sets PIDSource as displacement for PID loop
@@ -142,10 +185,10 @@ public class Robot extends IterativeRobot {
 		rWinch= new Victor(5); //Right winch motor
 		lWinch=new Victor(6); //Left winch motor
 
-		clawOpen = new Solenoid(0);
-		clawClose = new Solenoid(1);
-		pusherOpen = new Solenoid(2);
-		pusherClose = new Solenoid(3);
+		pusherOpen = new Solenoid(0);
+		pusherClose = new Solenoid(1);
+		clawOpen = new Solenoid(2);
+		clawClose = new Solenoid(3);
 		scissorOpen = new Solenoid(4);
 		scissorClose = new Solenoid(5);
 
@@ -160,10 +203,11 @@ public class Robot extends IterativeRobot {
 		clawSeq = 0;
 
 		gameFieldData = "";
-
+		
 		scissorOpen.set(true);
 		scissorClose.set(false);
 		AutoChoose = "";
+		turning = "";
 	}
 
 	/**
@@ -177,7 +221,7 @@ public class Robot extends IterativeRobot {
 	 * the switch structure below with additional strings. If using the
 	 * SendableChooser make sure to add them to the chooser code above as well.
 	 */
-
+	
 	@Override
 	public void disabledInit() {
 		timed.stop();
@@ -195,9 +239,10 @@ public class Robot extends IterativeRobot {
 		toBePushed = false;
 		clawSeq = 0;
 	}
-
+	
 	@Override
 	public void disabledPeriodic() {
+//		SmartDashboard.putString("Value of the thingy", gameFieldData.charAt(0) + " ");
 		if(stick.getTrigger()) {
 			AutoChoose = "Middle";
 		}
@@ -227,15 +272,15 @@ public class Robot extends IterativeRobot {
 		rEncoder.reset();
 		scissorOpen.set(true);
 		scissorClose.set(false);
-		pusherOpen.set(false);
-		pusherClose.set(true);
-		clawOpen.set(false);
-		clawClose.set(true);
+//		pusherOpen.set(false);
+//		pusherClose.set(true);
+//		clawOpen.set(false);
+//		clawClose.set(true);
 		isClosed = true;
 		scissor = false;
 		toBePushed = false;
 		clawSeq = 0;
-
+		
 		rEncoder.reset();
 		lEncoder.reset();
 		rDistanceController = new PIDController(kP, kI, kD, kF, rEncoder, mRight);
@@ -250,22 +295,22 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void autonomousPeriodic() {
 		gameFieldData = DriverStation.getInstance().getGameSpecificMessage();
-		SmartDashboard.putNumber("Right Distance", rEncoder.getDistance());
-		SmartDashboard.putNumber("Left Encoder", lEncoder.getDistance());
-
-		rDistanceController.disable(); //Enable when ready. Disabled because of crash
-		lDistanceController.disable(); //Enable when ready. Disabled because of crash
-		//Change PID values in shuffleboard. DO NOT GO ABOVE 0.1 ON ANY VALUE
-		rDistanceController.setSetpoint(1);
-		lDistanceController.setSetpoint(1);
-		SmartDashboard.putData("Right PID Loop", rDistanceController);
-		SmartDashboard.putData("Left PID Loop", lDistanceController);
+		SmartDashboard.putNumber("Right Distance", rEncoder.get());
+		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
+		SmartDashboard.putString("Value of the thingy", gameFieldData.charAt(0) + " ");
+		
+//		rDistanceController.disable(); //Enable when ready. Disabled because of crash
+//		lDistanceController.disable(); //Enable when ready. Disabled because of crash
+//		//Change PID values in shuffleboard. DO NOT GO ABOVE 0.1 ON ANY VALUE
+//		rDistanceController.setSetpoint(1);
+//		lDistanceController.setSetpoint(1);
+//		SmartDashboard.putData("Right PID Loop", rDistanceController);
+//		SmartDashboard.putData("Left PID Loop", lDistanceController);
 //		drive.tankDrive(rDistanceController.get(), lDistanceController.get()); //Use drive to operate robot because instance was already created in RobotInit
 		//Use encoder.getDistance instead of get raw. The values are set in feet, and the robot will over shoot if no PID algorithm is implemented
-		//Using encoder.get() is the same as encoder.getDistance but with it doesn't check since last time it was checked.
 		switch (AutoChoose) {
 			case "Left":
-			if(gameFieldData.charAt(0) == 'L') {
+				if(gameFieldData.charAt(0) == 'L') {
 				if(rEncoder.get() < 5000) {
 					mRight.set(0.35);
 					mLeft.set(-0.35);
@@ -290,10 +335,10 @@ public class Robot extends IterativeRobot {
 					mLeft.set(0);
 				}
 
-			}
+				}
 				break;
 			case "Right":
-			if(gameFieldData.charAt(0) == 'L') {
+				if(gameFieldData.charAt(0) == 'L') {
 				if(rEncoder.get() < 5000) {
 					mRight.set(0.35);
 					mLeft.set(-0.35);
@@ -317,8 +362,8 @@ public class Robot extends IterativeRobot {
 					mRight.set(0);
 					mLeft.set(0);
 				}
-
-			}
+//
+				}
 				break;
 			case "Middle":
 				if(gameFieldData.charAt(0) == 'L') {
@@ -342,6 +387,7 @@ public class Robot extends IterativeRobot {
 						mRight.set(0);
 						mLeft.set(0);
 						AutoChoose = "";
+						turning = "Left";
 						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
 					}else {
 						mRight.set(0);
@@ -352,9 +398,26 @@ public class Robot extends IterativeRobot {
 				break;
 
 		}
+		
+		
+		switch(turning) {
+		case "Left":
+			if(ahrs.getYaw() < 90) {
+				mRight.set(0.35);
+				mLeft.set(0.35);
+			}else if(ahrs.getYaw() <90){
+				mRight.set(0);
+				mLeft.set(0);
+				turning = "";
+			}else {
+				mRight.set(0);
+				mLeft.set(0);
+			}
+			break;
+		
+		}
 		SmartDashboard.updateValues();
 	}
-
 	/**
 	 * This function is called periodically during operator control.
 	 */
@@ -423,7 +486,7 @@ public class Robot extends IterativeRobot {
 			isClosed = true;
 
 		}
-
+		
 		clawSeq = (int)timed.get();
 		SmartDashboard.putNumber("claw seq", clawSeq);
 		switch(clawSeq) {
@@ -433,7 +496,7 @@ public class Robot extends IterativeRobot {
 				pusherOpen.set(true);
 				pusherClose.set(false);
 				break;
-
+			
 			case 1:
 				pusherOpen.set(false);
 				pusherClose.set(true);
@@ -465,16 +528,19 @@ public class Robot extends IterativeRobot {
 			SmartDashboard.updateValues();
 
 	}
-
-
+	
+	
 
 	/**
 	 * This function is called periodically during test mode.
 	 */
 	@Override
 	public void testInit() {
+		ahrs.zeroYaw();
 		timed.stop();
 		timed.reset();
+		scissorOpen.set(true);
+		scissorClose.set(false);
 		if(controller.getBackButton()) {
 			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
 	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
@@ -487,32 +553,35 @@ public class Robot extends IterativeRobot {
 	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
  		}
 		SmartDashboard.updateValues();
-
 	}
 
+	
 
 
+
+
+	
 	 @Override
  	public void testPeriodic() {
-
+		 
 
  		lSpeed = controller.getY(hand.kLeft);
  		rSpeed = controller.getY(hand.kRight);
 
- 		drive.tankDrive(rSpeed,lSpeed);
+// 		drive.tankDrive(rSpeed,lSpeed);
 
  		if(controller.getBButtonPressed() && !(scissor)) {
  			scissorOpen.set(true);
  			scissorClose.set(false);
  			scissor = true;
-
+ 			
  		}
 
  		if(controller.getXButtonPressed() && scissor) {
  			scissorOpen.set(false);
  			scissorClose.set(true);
  			scissor = false;
-
+ 			
 	 }
 
  		 if(controller.getBumper(hand.kRight) && isClosed){
@@ -528,41 +597,102 @@ public class Robot extends IterativeRobot {
 
  		SmartDashboard.putBoolean("Start Button", controller.getStartButton());
  		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
-
+ 		
  		if(stick.getRawButton(3)) {
  			lWinch.set(-1);
  		}else {
  			lWinch.set(0);
  		}
-
+ 		
  		if(stick.getRawButton(4)) {
  			rWinch.set(1);
  		}else {
  			rWinch.set(0);
  		}
-
+ 		
+ 		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
+			SmartDashboard.putNumber("ArmL",controller.getTriggerAxis(hand.kLeft));
+			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
+		}
+		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
+			arm.set(controller.getTriggerAxis(hand.kRight ));
+		}
  		if(controller.getYButton()) {
  			timed.start();
  		}
-
+ 		
  		if(lEncoder.get()< 2000) {
  			SmartDashboard.putBoolean("Here i am", true);
  		} else {
 			SmartDashboard.putBoolean("Here i am", false);
  		}
-
-
-
-	 if (controller.getYButton()) {
-
-		 pusherOpen.set(true);
-		 pusherClose.set(false);
-
-	  }else {
-
-		  pusherOpen.set(false);
-	 	  pusherClose.set(true);
-
-	  	}
+ 		
+	 
+ 	
+//	 if (stick.getRawButton(5)) {
+//		
+//		 pusherOpen.set(true);
+//		 pusherClose.set(false);
+//	 
+//	  }else {
+//		  
+//		  pusherOpen.set(false);
+//	 	  pusherClose.set(true);
+//	 	  
+//	  	}
+//	 
+	 if(stick.getRawButton(2)) {
+		 clawOpen.set(false);
+		 clawClose.set(true);
+	 }else {
+		 clawOpen.set(true);
+		 clawClose.set(false);
 	 }
+	 
+	 SmartDashboard.putBoolean("turnController Enabled", turnController.isEnabled());
+	 SmartDashboard.putNumber("navX Yaw", ahrs.getYaw());
+    
+     	if ( stick.getRawButton(5)) {
+     		if(ahrs.getYaw() <90) {
+     			drive.tankDrive(1,-1);
+     		}
+//     		if (!turnController.isEnabled()) {
+//     			turnController.setSetpoint(kTargetAngleDegrees);
+//     			rotateToAngleRate = 0; // This value will be updated in the pidWrite() method.
+//     			turnController.enable();
+//     		}
+//     		
+//     		double leftStickValue = rotateToAngleRate;
+//     		double rightStickValue = rotateToAngleRate;
+//     		SmartDashboard.putNumber("Turn Value Left", leftStickValue);
+//     		SmartDashboard.putNumber("Turn Value Right", rightStickValue);
+//     		drive.tankDrive(leftStickValue,  rightStickValue);
+     		
+     	} else if (stick.getRawButton(6)) {
+     		ahrs.zeroYaw();
+	 
+     	}else {
+    		if(turnController.isEnabled()) {
+    			turnController.disable();
+    		}
+    		drive.tankDrive(rSpeed,lSpeed);
+    	}
+     	
+     		
+//	 double magnitude = (stick.getY() + stick.getY());
+//		double leftStickValue = magnitude + rotateToAngleRate;
+//		double rightStickValue = magnitude - rotateToAngleRate;
+//		drive.tankDrive(leftStickValue,rightStickValue);
+//	 
+	 }
+	 
+	 @Override
+	 public void pidWrite(double output) {
+	 	rotateToAngleRate = output;
+	 } 
   }
+
+
+	 
+  
+	 
