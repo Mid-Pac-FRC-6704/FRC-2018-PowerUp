@@ -71,9 +71,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	private Encoder rEncoder;
 	private Encoder lEncoder;
 	
-	private double kP = 0.30;
+	private double kP = 1.1;
 	private double kI = 0.15;
-	private double kD = 0.10;
+	private double kD = 2.3;
 	private double kF = 0.00;
 	private PIDController rDistanceController;
 	private PIDController lDistanceController;
@@ -95,8 +95,8 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	private Solenoid scissorClose; //Solenoid for closing scissor lift
 
 	private Hand hand;
-	private static XboxController controller;// Xbox controller variable 
-	private Joystick stick; // Joystick variable
+	private static XboxController controllerDrive;// Xbox controller variable 
+	private static XboxController controllerClimb;
 	private boolean isClosed; 
 	private DigitalInput limitOne;
 	private DigitalInput limitTwo;
@@ -107,12 +107,22 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	private String turning;
 	private String gameFieldData;
 	
+	private boolean clawThingy;
+	
+	private boolean driveBy;
+	
 	AHRS ahrs;
 
+	double krP = 0.10;
+	double krI = 0.10;
+	double krD = 0.10;
+	double krF = 0.00;
     PIDController turnController; // PID controller variable 
     double rotateToAngleRate;
 	final double kToleranceDegrees = 2.0f;    
-	final double kTargetAngleDegrees = 90.0f;
+	final double kTargetAngleDegrees = 0.0f;
+	
+	boolean testingThis;
 	/**
 	 * This function is run when the robot is first started up and should be
 	 * used for any initialization code.
@@ -143,9 +153,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	            DriverStation.reportError("Error instantiating navX MXP:  " + ex.getMessage(), true);
 	        }
 		
-		turnController = new PIDController(kP, kI, kD, kF, ahrs,this); // tells the PID controller what values to use
+		turnController = new PIDController(krP, krI, krD, krF, ahrs,this); // tells the PID controller what values to use
 		turnController.setInputRange(-180.0f,180.0f);// max & min rotation degrees 
-		turnController.setOutputRange(-1.0,1.0); // speed at which the robor rotates
+		turnController.setOutputRange(-0.2,0.2); // speed at which the robor rotates
 		turnController.setAbsoluteTolerance(kToleranceDegrees);
 		turnController.setContinuous(true);
 		turnController.disable();
@@ -153,12 +163,13 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 
 		new Thread(() -> {
-            UsbCamera usbCam = CameraServer.getInstance().startAutomaticCapture(); // USB camera feed activation
-            usbCam.setResolution(640, 480); // what resolution the camera broadcasts its feed
+            UsbCamera usbCam = CameraServer.getInstance().startAutomaticCapture("USB cam", "/dev/video0"); // USB camera feed activation
+            usbCam.setResolution(640, 480); // what resolution the camera broadcasts its feed "USB cam", "/dev/video0"
+            
             //Kinect class -> not done yet. Will get too it.
             //Kinect kinect = new Kinect();
         }).start();
-
+		
 		timed = new Timer();
 
 		trMotor = new Spark(0); //Top right motor
@@ -168,6 +179,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		tlMotor = new Spark(1); //Top left motor
 		blMotor = new Spark(3); //Back left motor
 		mLeft = new SpeedControllerGroup(tlMotor, blMotor); //Matches values for left speed controllers
+
+		drive = new DifferentialDrive(mLeft, mRight); //Tank drive object
+		
 		
 
 		rEncoder = new Encoder(2, 3, true, Encoder.EncodingType.k4X); //Right encoder
@@ -177,6 +191,15 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		lEncoder = new Encoder(4, 5, false, Encoder.EncodingType.k4X); //Left encoder
 		lEncoder.setDistancePerPulse(Math.PI/(4096)); //Sets distance in feet per pulse using 2048 pulses  per revolution scale factor
 		lEncoder.setPIDSourceType(PIDSourceType.kDisplacement); //Sets PIDSource as displacement for PID loop
+		
+		rDistanceController = new PIDController(kP, kI, kD, kF, rEncoder, mRight);
+		rDistanceController.setPercentTolerance(0.05);
+		rDistanceController.setOutputRange(-0.5, 0.5);
+		rDistanceController.disable();
+		lDistanceController = new PIDController(kP, kI, kD, kF, lEncoder, mLeft);
+		lDistanceController.setPercentTolerance(0.1);
+		lDistanceController.setOutputRange(-0.5, 0.5);
+		lDistanceController.disable();
 
 		arm = new Victor(4); //Arm motor
 		rWinch= new Victor(5); //Right winch motor
@@ -192,31 +215,29 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		limitOne = new DigitalInput(0);
 		limitTwo = new DigitalInput(1);
 
-		stick = new Joystick(1);
-		controller = new XboxController(0);
+//		stick = new Joystick(1);
+		controllerDrive = new XboxController(0);
+		controllerClimb = new XboxController(1);
 		isClosed = true;
 		scissor = false;
 		toBePushed = false;
 		clawSeq = -1;
+		
+		clawThingy = true;
 
 		gameFieldData = "";
-		
 		scissorOpen.set(true);
 		scissorClose.set(false);
 		AutoChoose = "";
 		turning = "";
+		ahrs.zeroYaw();
+		 
+		testingThis=false;
+		driveBy = false;
 	}
 
 	/**
-	 * This autonomous (along with the chooser code above) shows how to select
-	 * between different autonomous modes using the dashboard. The sendable
-	 * chooser code works with the Java SmartDashboard. If you prefer the
-	 * LabVIEW Dashboard, remove all of the chooser code and uncomment the
-	 * getString line to get the auto name from the text box below the Gyro
-	 *
-	 * <p>You can add additional auto modes by adding additional comparisons to
-	 * the switch structure below with additional strings. If using the
-	 * SendableChooser make sure to add them to the chooser code above as well.
+	 * to be called it initialize the disabled periodic
 	 */
 	
 	@Override
@@ -237,55 +258,72 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		clawSeq = -1;
 	}
 	
+	/**
+	 * to be called within the disabled period ..... basically to be called while disabled.
+	 */
+	
 	@Override
 	public void disabledPeriodic() {
 //		SmartDashboard.putString("Value of the thingy", gameFieldData.charAt(0) + " ");
-		if(stick.getTrigger()) {
+		 SmartDashboard.putNumber("navX Yaw", ahrs.getYaw());
+		
+		if(controllerClimb.getAButtonPressed()) {
 			AutoChoose = "Middle";
 		}
-		if(stick.getRawButton(3)) {
+		if(controllerClimb.getXButtonPressed()) {
 			AutoChoose = "Left";
 		}
-		if(stick.getRawButton(4)) {
+		if(controllerClimb.getBButtonPressed()) {
 			AutoChoose = "Right";
 		}
 		SmartDashboard.putString("Autonomous Selecting", AutoChoose);
-		if(controller.getBackButton()) {
-			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
-	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
- 		}else if(controller.getStartButton()) {
- 			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
-	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+		if(controllerDrive.getBackButton()) {
+			SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
+ 		}else if(controllerDrive.getStartButton()) {
+ 			SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
  		}
  		else {
- 			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
-	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+ 			SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
  		}
+		
+		if(controllerClimb.getStartButton()) {
+			ahrs.zeroYaw();
+		}
+		SmartDashboard.putData("Rotate PID Loop", turnController);
+		SmartDashboard.putNumber("Angle Error", turnController.getError());
+		SmartDashboard.putData("Tank Drive", drive);
+		SmartDashboard.putNumber("Rotate PID Output", rotateToAngleRate);
+		SmartDashboard.putNumber("Right Distance", rEncoder.get());
+		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
+		SmartDashboard.putBoolean("IS CLOSED", isClosed);
+		SmartDashboard.putBoolean("To be pushed", toBePushed);
+		SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
+ 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
+
 		SmartDashboard.updateValues();
 	}
+	
+	/**
+	 * initialization of the autonomous period
+	 */
+	
 	@Override
 	public void autonomousInit() {
 		lEncoder.reset();
 		rEncoder.reset();
 		scissorOpen.set(true);
 		scissorClose.set(false);
-//		pusherOpen.set(false);
-//		pusherClose.set(true);
-//		clawOpen.set(false);
-//		clawClose.set(true);
 		isClosed = true;
 		scissor = false;
 		toBePushed = false;
 		clawSeq = -1;
-		
-		rEncoder.reset();
-		lEncoder.reset();
-		rDistanceController = new PIDController(kP, kI, kD, kF, rEncoder, mRight);
-		rDistanceController.setPercentTolerance(0.02);
-		rDistanceController.setOutputRange(-0.5, 0.5);
-		lDistanceController = new PIDController(kP, kI, kD, kF, lEncoder, mLeft);
-		lDistanceController.setPercentTolerance(0.02);
-		lDistanceController.setOutputRange(-0.5, 0.5);
+		turning = "";
+//		mLeft.setInverted(true);
+//		rEncoder.reset();
+//		lEncoder.reset();
 	}
 
 	/**
@@ -293,143 +331,154 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	 */
 	@Override
 	public void autonomousPeriodic() {
-//		gameFieldData = DriverStation.getInstance().getGameSpecificMessage();
-//		SmartDashboard.putNumber("Right Distance", rEncoder.get());
-//		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
-//		SmartDashboard.putString("Value of the thingy", gameFieldData.charAt(0) + " ");
+		gameFieldData = DriverStation.getInstance().getGameSpecificMessage();
+		SmartDashboard.putNumber("Right Distance", rEncoder.get());
+		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
+		SmartDashboard.putString("Game Field Data", gameFieldData.charAt(0) + " ");
 //		
 //		rDistanceController.disable(); //Enable when ready. Disabled because of crash
 //		lDistanceController.disable(); //Enable when ready. Disabled because of crash
-//		//Change PID values in shuffleboard. DO NOT GO ABOVE 0.1 ON ANY VALUE
-//		rDistanceController.setSetpoint(1);
-//		lDistanceController.setSetpoint(1);
-//		SmartDashboard.putData("Right PID Loop", rDistanceController);
-		SmartDashboard.putData("Left PID Loop", lDistanceController);
-//		drive.tankDrive(rDistanceController.get(), lDistanceController.get()); //Use drive to operate robot because instance was already created in RobotInit
-		//Use encoder.getDistance instead of get raw. The values are set in feet, and the robot will over shoot if no PID algorithm is implemented
 		/*
+		//Change PID values in shuffleboard. DO NOT GO ABOVE 0.1 ON ANY VALUE
+		rDistanceController.setSetpoint(10);
+		lDistanceController.setSetpoint(10);
+		SmartDashboard.putData("Right PID Loop", rDistanceController);
+		SmartDashboard.putData("Left PID Loop", lDistanceController);
+		SmartDashboard.putData("Rotate PID Loop", turnController);
+		
+		*/
+		//Use encoder.getDistance instead of get raw. The values are set in feet, and the robot will over shoot if no PID algorithm is implemented
+
+		
 		switch (AutoChoose) {
 			case "Left":
 				if(gameFieldData.charAt(0) == 'L') {
-				if(rEncoder.get() < 5000) {
-					mRight.set(0.35);
-					mLeft.set(-0.35);
-				}else if(rEncoder.get() > 5000) {
-					mRight.set(0);
-					mLeft.set(0);
-					AutoChoose = "";
+					if(rEncoder.get() < 16000 && lEncoder.get() < 16000) {
+						mRight.set(0.45);
+						mLeft.set(-0.45);
+					}else {
+						mRight.set(0);
+						mLeft.set(0);
+						ahrs.zeroYaw();
+						AutoChoose = "";
+						turning = "Left";
+					}
 				}else {
-					mRight.set(0);
-					mLeft.set(0);
-				}
-			}else {
-				if(rEncoder.get() < 5000) {
-					mRight.set(0.35);
-					mLeft.set(-0.35);
-				}else if(rEncoder.get() > 5000) {
-					mRight.set(0);
-					mLeft.set(0);
-					AutoChoose = "";
-				}else {
-					mRight.set(0);
-					mLeft.set(0);
-				}
-
+					if(rEncoder.get() < 16000 && lEncoder.get() < 16000) {
+						mRight.set(0.45);
+						mLeft.set(-0.45);
+					}else {
+						mRight.set(0);
+						mLeft.set(0);
+						AutoChoose = "";
+					}
 				}
 				break;
 			case "Right":
 				if(gameFieldData.charAt(0) == 'L') {
-				if(rEncoder.get() < 5000) {
-					mRight.set(0.35);
-					mLeft.set(-0.35);
-				}else if(rEncoder.get() > 5000) {
-					mRight.set(0);
-					mLeft.set(0);
-					AutoChoose = "";
-				}else {
-					mRight.set(0);
-					mLeft.set(0);
-				}
-				}else {
-					if(rEncoder.get() < 5000) {
-						mRight.set(0.35);
-						mLeft.set(-0.35);
-					}else if(rEncoder.get() > 5000) {
-						mRight.set(0);
-						mLeft.set(0);
-						AutoChoose = "";
+					if(rEncoder.get() < 16000 && lEncoder.get() < 16000) {
+						mRight.set(0.45);
+						mLeft.set(-0.45);
 					}else {
 						mRight.set(0);
 						mLeft.set(0);
+						AutoChoose = "";
+					}
+				}else {
+					if(rEncoder.get() < 16000 && lEncoder.get() < 16000) {
+						mRight.set(0.45);
+						mLeft.set(-0.45);
+					}else{
+						mRight.set(0);
+						mLeft.set(0);
+						ahrs.zeroYaw();
+						AutoChoose = "";
+						turning = "Right";
 					}
 				}
 				break;
-			case "Middle":
-				if(gameFieldData.charAt(0) == 'L') {
-					if(rEncoder.get() < 5000) {
-						mRight.set(0.35);
-						mLeft.set(-0.35);
-					}else if(rEncoder.get() > 5000) {
-						mRight.set(0);
-						mLeft.set(0);
-						AutoChoose = "";
-					}else {
-						mRight.set(0);
-						mLeft.set(0);
-					}
-				}else {
-					if(rEncoder.get() < 5000) {
-						mRight.set(0.35);
-						mLeft.set(-0.35);
-						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
-					}else if(rEncoder.get() > 5000) {
-						mRight.set(0);
-						mLeft.set(0);
-						AutoChoose = "";
-						turning = "Left";
-						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
-					}else {
-						mRight.set(0);
-						mLeft.set(0);
-					}
-
-				}
-				break;
+//			case "Middle":
+//				if(gameFieldData.charAt(0) == 'L') {
+//					if(rEncoder.get() < 5000) {
+//						mRight.set(0.35);
+//						mLeft.set(-0.35);
+//					}else if(rEncoder.get() > 5000) {
+//						mRight.set(0);
+//						mLeft.set(0);
+//						AutoChoose = "";
+//					}else {
+//						mRight.set(0);
+//						mLeft.set(0);
+//					}
+//				}else {
+//					if(rEncoder.get() < 5000) {
+//						mRight.set(0.35);
+//						mLeft.set(-0.35);
+//						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
+//					}else if(rEncoder.get() > 5000) {
+//						mRight.set(0);
+//						mLeft.set(0);
+//						AutoChoose = "";
+//						turning = "Left";
+//						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
+//					}else {
+//						mRight.set(0);
+//						mLeft.set(0);
+//					}
+//
+//				}
+//				break;
 
 		}
 		
 		
 		switch(turning) {
-		case "Left":
-			if(ahrs.getYaw() < 90) {
-				mRight.set(0.35);
-				mLeft.set(0.35);
-			}else if(ahrs.getYaw() <90){
-				mRight.set(0);
-				mLeft.set(0);
-				turning = "";
-			}else {
-				mRight.set(0);
-				mLeft.set(0);
-			}
+			case "Left":
+				if(ahrs.getYaw() < 130) {
+					mRight.set(-0.55);
+					mLeft.set(-0.55);
+				}else{
+					mRight.set(0);
+					mLeft.set(0);
+					lEncoder.reset();
+					rEncoder.reset();
+					driveBy = true;
+					turning = "";
+				}
 			break;
 		
 		case "Right":
-			if(ahrs.getYaw() > -90) {
-				mRight.set(-0.35);
-				mLeft.set(-0.35);
-			}else if(ahrs.getYaw() <= -80 || ahrs.getYaw() >= -85){
+			if(ahrs.getYaw() > -130) {
+				mRight.set(0.55);
+				mLeft.set(0.55);
+			}else{
 				mRight.set(0);
 				mLeft.set(0);
+				lEncoder.reset();
+				rEncoder.reset();
+				driveBy = true;
 				turning = "";
-			}else {
-				mRight.set(0);
-				mLeft.set(0);
 			}
 			break;
 		
 		}
-		*/
+		
+		if(driveBy) {
+			if(rEncoder.get() < 1000) {
+				mRight.set(0.45);
+				mLeft.set(0.-45);
+			}else if(rEncoder.get() > 1000) {
+				mRight.set(0);
+				mLeft.set(0);
+				pusherOpen.set(false);
+				pusherClose.set(true);
+				clawOpen.set(false);
+				clawClose.set(true);
+				driveBy = false;
+			}
+		}
+		
+		SmartDashboard.putNumber("navX Yaw", ahrs.getYaw());
 		SmartDashboard.updateValues();
 	}
 	/**
@@ -450,56 +499,60 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		toBePushed = false;
 		clawSeq = 0;
 		
-		drive = new DifferentialDrive(mLeft, mRight); //Tank drive object
+		mLeft.setInverted(false);
+		lDistanceController.disable();
+		rDistanceController.disable();
 	}
 
 	@Override
 	public void teleopPeriodic() {
 
-
-		lSpeed = controller.getY(hand.kLeft);
-		rSpeed = controller.getY(hand.kRight);
+		SmartDashboard.putNumber("navX Yaw", ahrs.getYaw());
+		
+//		Main controller controls
+		lSpeed = controllerDrive.getY(hand.kLeft);
+		rSpeed = controllerDrive.getY(hand.kRight);
 
 		drive.tankDrive(rSpeed,lSpeed);
 		SmartDashboard.putData("Tank Drive", drive); // sends tank drive data to the shuffle board
 		SmartDashboard.putNumber("Right Distance", rEncoder.getDistance()); // gets the distance reading from the right encoder and puts it on the shuffleboard
 		SmartDashboard.putNumber("Left Encoder", lEncoder.getDistance());// gets the distance reading from the left encoder and puts it on the shuffleboard
 
-		if( limitOne.get() && limitTwo.get()&& !(isClosed)){ // closes claw
+		if(clawThingy && controllerDrive.getBumperPressed(hand.kRight)) {
 			pusherOpen.set(true);
 			pusherClose.set(false);
-			isClosed = true;
-			toBePushed = true;
-			clawSeq = 0;
-		}
-
-		if(controller.getBumper(hand.kRight)&& isClosed){ // opens claw when bumper is pressed 
+			clawThingy = false;
+		}else if(!clawThingy && controllerDrive.getBumperPressed(hand.kRight)) {
 			pusherOpen.set(false);
 			pusherClose.set(true);
-			isClosed = false;
+			clawThingy = true;
 		}
+		
 
 		SmartDashboard.putBoolean("IS CLOSED", isClosed);
 		SmartDashboard.putBoolean("To be pushed", toBePushed);
-		SmartDashboard.putBoolean("Start Button", controller.getStartButton());
- 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+		SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
+ 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
 
-		if(controller.getBumper(hand.kLeft)&& toBePushed) {
+		if(controllerDrive.getBumperPressed(hand.kLeft)&& !clawThingy) {
 			clawSeq = 0;
 			timed.reset();
 			timed.start();
+			clawThingy = true;
 		}
 
-		if(controller.getStartButton()) {
+		if(controllerDrive.getStartButton()) {
 			pusherOpen.set(true);
 			pusherClose.set(false);
 			isClosed = true;
 			scissor = false;
 			toBePushed = false;
-//
 		}
-		if(controller.getBackButton()) {
+		
+		if(controllerDrive.getBackButton()) {
 			isClosed = true;
+			pusherOpen.set(false);
+			pusherClose.set(true);
 		}
 		
 		clawSeq = (int)timed.get();
@@ -524,23 +577,31 @@ public class Robot extends IterativeRobot implements PIDOutput {
 				break;
 		}
 
-		if(controller.getBButton()) {
+		SmartDashboard.putBoolean("Arm limit switch", limitOne.get());
+		
+//		 What are we using this limit switch for?
+		SmartDashboard.putBoolean("LimitSwitchRight", limitTwo.get());
+
+		
+		if(controllerDrive.getTriggerAxis(hand.kLeft)> 0.1) {
+			arm.set(controllerDrive.getTriggerAxis(hand.kLeft) * -1);
+		} else if(controllerDrive.getTriggerAxis(hand.kRight)> 0.01 && !limitOne.get()) {
+			arm.set(controllerDrive.getTriggerAxis(hand.kRight ));
+		}else if(!limitOne.get() && controllerDrive.getTriggerAxis(hand.kLeft)< 0.01){
+			arm.set(0);
+		}else{
+			arm.set(0);
+		}
+		 
+		
+		// Second controller controls
+		if(controllerClimb.getBButton()) {
 			scissorOpen.set(false);
 			scissorClose.set(true);
 		}
-
-		SmartDashboard.putBoolean("LimitSwitchLeft", limitOne.get());
-		SmartDashboard.putBoolean("LimitSwitchRight", limitTwo.get());
-
-
-		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
-			SmartDashboard.putNumber("ArmL",controller.getTriggerAxis(hand.kLeft));
-			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
-		}
-		if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
-			arm.set(controller.getTriggerAxis(hand.kRight ));
-		}
-
+		
+		lWinch.set(controllerClimb.getTriggerAxis(hand.kLeft));
+		rWinch.set(controllerClimb.getTriggerAxis(hand.kRight));
 			SmartDashboard.updateValues();
 
 	}
@@ -548,7 +609,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	
 
 	/**
-	 * This function is called periodically during test mode.
+	 * This function is called initially before the test periodic. Usually to initialize stuff before starting.
 	 */
 	@Override
 	public void testInit() {
@@ -557,29 +618,64 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		timed.reset();
 		scissorOpen.set(true);
 		scissorClose.set(false);
-		if(controller.getBackButton()) {
-			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
-	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
- 		}else if(controller.getStartButton()) {
- 			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
-	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+		if(controllerDrive.getBackButton()) {
+			SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
+ 		}else if(controllerDrive.getStartButton()) {
+ 			SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
  		}
  		else {
- 			SmartDashboard.putBoolean("Start Button", controller.getStartButton());
-	 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
+ 			SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
+	 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
  		}
+		ahrs.zeroYaw();
 		SmartDashboard.updateValues();
 	}
-
 	
-
-
-
-
 	
+	/**
+	 * This class is a test. Only to be used when testing things. once the things are tested, you are able to put them into the teleop periodic
+	 * otherwise, don't put them into the teleop
+	 */
 	 @Override
  	public void testPeriodic() {
+		 SmartDashboard.putNumber("navX Yaw", ahrs.getYaw());
 		 
+		 if(ahrs.getYaw() > -90) {
+			mRight.set(0.5);
+			mLeft.set(0.5);
+		 }else {
+			mRight.set(0);
+			mLeft.set(0);
+		 }
+		 
+//		|| (ahrs.getYaw() < -90 && ahrs.getYaw() > -110)
+
+//			 if(ahrs.getYaw() > -100  ) {
+//				mRight.set(-0.4);
+//				mLeft.set(-0.4);
+//			 }else {
+//				mRight.set(0);
+//				mLeft.set(0);
+//			 }
+		 
+//			turnController.setSetpoint(15.0f);
+//			
+//			SmartDashboard.putData("Rotate PID Loop", turnController);
+//			SmartDashboard.putNumber("Angle Error", turnController.getError());
+//			SmartDashboard.putData("Tank Drive", drive);
+//			SmartDashboard.putNumber("Rotate PID Output", rotateToAngleRate);
+//			turnController.enable();
+//			double left = rotateToAngleRate;
+//			double right = rotateToAngleRate;
+//			mRight.set(right);
+//			mLeft.set(left);
+//			drive.tankDrive(left, right);
+//			
+//			
+//			SmartDashboard.updateValues();
+		 /*
 
  		lSpeed = controller.getY(hand.kLeft); // sets left motor speed based off of y value
  		rSpeed = controller.getY(hand.kRight); // sets right motor speed based off of y value
@@ -632,6 +728,9 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		}else if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
 			arm.set(controller.getTriggerAxis(hand.kRight ));
 		}else if (controller.getTriggerAxis(hand.kRight)< 0.01 && controller.getTriggerAxis(hand.kLeft)< 0.01){
+			arm.set(0);
+		}
+		else {
 			arm.set(0);
 		}
  		if(controller.getYButton()) {
@@ -700,13 +799,16 @@ public class Robot extends IterativeRobot implements PIDOutput {
 //		double leftStickValue = magnitude + rotateToAngleRate;
 //		double rightStickValue = magnitude - rotateToAngleRate;
 //		drive.tankDrive(leftStickValue,rightStickValue);
-//	 
+     	
+	 */
 	 }
+	 
 	 
 	 @Override
 	 public void pidWrite(double output) {
 	 	rotateToAngleRate = output;
-	 } 
+	 }
+	  
   }
 
 
