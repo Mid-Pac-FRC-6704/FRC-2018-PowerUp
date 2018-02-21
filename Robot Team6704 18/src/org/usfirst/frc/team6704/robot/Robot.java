@@ -97,19 +97,19 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	private Hand hand;
 	private static XboxController controllerDrive;// Xbox controller variable 
 	private static XboxController controllerClimb;
-	private boolean isClosed; 
 	private DigitalInput limitOne;
 	private DigitalInput limitTwo;
 	private int clawSeq;
-	private boolean toBePushed;
 	private Timer timed;
 	private String AutoChoose;
 	private String turning;
 	private String gameFieldData;
-	
 	private boolean clawThingy;
-	
 	private boolean driveBy;
+	private String middleDrive;
+	private boolean shootAuto;
+	
+	
 	
 	AHRS ahrs;
 
@@ -123,6 +123,11 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	final double kTargetAngleDegrees = 0.0f;
 	
 	boolean testingThis;
+	
+	
+	
+	
+	
 	/**
 	 * This function is run when the robot is first started up and should be
 	 * used for any initialization code.
@@ -163,12 +168,14 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 
 		new Thread(() -> {
-            UsbCamera usbCam = CameraServer.getInstance().startAutomaticCapture("USB cam", "/dev/video0"); // USB camera feed activation
-            usbCam.setResolution(640, 480); // what resolution the camera broadcasts its feed "USB cam", "/dev/video0"
-            
+            UsbCamera usbCam = CameraServer.getInstance().startAutomaticCapture(); // USB camera feed activation
+            usbCam.setResolution(320, 240); // what resolution the camera broadcasts its feed "USB cam", "/dev/video0"
+            usbCam.setFPS(60); // IN THE CASE OF CAMERA FAILURE, RENAME CAMERA WITH ABOVE COMMENT!!!
             //Kinect class -> not done yet. Will get too it.
             //Kinect kinect = new Kinect();
         }).start();
+		
+		
 		
 		timed = new Timer();
 
@@ -215,16 +222,14 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		limitOne = new DigitalInput(0);
 		limitTwo = new DigitalInput(1);
 
-//		stick = new Joystick(1);
 		controllerDrive = new XboxController(0);
 		controllerClimb = new XboxController(1);
-		isClosed = true;
 		scissor = false;
-		toBePushed = false;
 		clawSeq = -1;
 		
 		clawThingy = true;
 
+		middleDrive = "";
 		gameFieldData = "";
 		scissorOpen.set(true);
 		scissorClose.set(false);
@@ -234,6 +239,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		 
 		testingThis=false;
 		driveBy = false;
+		shootAuto = false;
 	}
 
 	/**
@@ -252,9 +258,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		pusherClose.set(true);
 //		clawOpen.set(false);
 //		clawClose.set(true);
-		isClosed = true;
 		scissor = false;
-		toBePushed = false;
 		clawSeq = -1;
 	}
 	
@@ -298,8 +302,6 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		SmartDashboard.putNumber("Rotate PID Output", rotateToAngleRate);
 		SmartDashboard.putNumber("Right Distance", rEncoder.get());
 		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
-		SmartDashboard.putBoolean("IS CLOSED", isClosed);
-		SmartDashboard.putBoolean("To be pushed", toBePushed);
 		SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
  		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
 
@@ -316,9 +318,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		rEncoder.reset();
 		scissorOpen.set(true);
 		scissorClose.set(false);
-		isClosed = true;
 		scissor = false;
-		toBePushed = false;
 		clawSeq = -1;
 		turning = "";
 //		mLeft.setInverted(true);
@@ -349,6 +349,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		*/
 		//Use encoder.getDistance instead of get raw. The values are set in feet, and the robot will over shoot if no PID algorithm is implemented
 
+		
 		
 		switch (AutoChoose) {
 			case "Left":
@@ -397,40 +398,91 @@ public class Robot extends IterativeRobot implements PIDOutput {
 					}
 				}
 				break;
-//			case "Middle":
-//				if(gameFieldData.charAt(0) == 'L') {
-//					if(rEncoder.get() < 5000) {
-//						mRight.set(0.35);
-//						mLeft.set(-0.35);
-//					}else if(rEncoder.get() > 5000) {
-//						mRight.set(0);
-//						mLeft.set(0);
-//						AutoChoose = "";
-//					}else {
-//						mRight.set(0);
-//						mLeft.set(0);
-//					}
-//				}else {
-//					if(rEncoder.get() < 5000) {
-//						mRight.set(0.35);
-//						mLeft.set(-0.35);
-//						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
-//					}else if(rEncoder.get() > 5000) {
-//						mRight.set(0);
-//						mLeft.set(0);
-//						AutoChoose = "";
-//						turning = "Left";
-//						SmartDashboard.putBoolean("if encoder stopped", rEncoder.getStopped());
-//					}else {
-//						mRight.set(0);
-//						mLeft.set(0);
-//					}
-//
-//				}
-//				break;
-
+			case "Middle":
+				if(rEncoder.get() < 7000 && lEncoder.get() < 7000) {
+					mRight.set(0.45);
+					mLeft.set(-0.45);
+				}else {
+					mRight.set(0);
+					mLeft.set(0);
+					AutoChoose = "";
+					if(gameFieldData.charAt(0) == 'L') {
+						middleDrive = "Left";
+					}else {
+						middleDrive = "Right";
+					}
+				}
+				break;
 		}
 		
+		switch(middleDrive){
+			case "Left":
+				if(ahrs.getYaw() < 130) {
+					mRight.set(-0.55);
+					mLeft.set(-0.55);
+				}else{
+					mRight.set(0);
+					mLeft.set(0);
+					lEncoder.reset();
+					rEncoder.reset();
+					middleDrive = "Drive A Bit";
+				}
+				break;
+			case "Right":
+				if(ahrs.getYaw() > -130) {
+					mRight.set(0.55);
+					mLeft.set(0.55);
+				}else{
+					mRight.set(0);
+					mLeft.set(0);
+					lEncoder.reset();
+					rEncoder.reset();
+					middleDrive = "Drive A Bit";
+				}
+				break;
+			case "Drive A Bit":
+				if(lEncoder.get()<4000 && rEncoder.get() < 4000) {
+					mRight.set(0.55);
+					mLeft.set(-0.55);
+				}else {
+					mRight.set(0);
+					mLeft.set(0);
+					if(gameFieldData.charAt(0) == 'L') {
+						middleDrive = "Rotate Right";
+					}else {
+						middleDrive = "Rotate Left";
+					}
+				}
+				break;
+				
+			case "Rotate left":
+				if(ahrs.getYaw() < 130) {
+					mRight.set(-0.55);
+					mLeft.set(-0.55);
+				}else{
+					mRight.set(0);
+					mLeft.set(0);
+					lEncoder.reset();
+					rEncoder.reset();
+					driveBy = true;
+					middleDrive = "";
+				}
+				break;
+			case "Rotate Right":
+				if(ahrs.getYaw() > -130) {
+					mRight.set(0.55);
+					mLeft.set(0.55);
+				}else{
+					mRight.set(0);
+					mLeft.set(0);
+					lEncoder.reset();
+					rEncoder.reset();
+					driveBy = true;
+					middleDrive = "";
+				}
+				break;
+			
+		}
 		
 		switch(turning) {
 			case "Left":
@@ -471,10 +523,21 @@ public class Robot extends IterativeRobot implements PIDOutput {
 				mRight.set(0);
 				mLeft.set(0);
 				pusherOpen.set(false);
+				driveBy = false;
+				shootAuto = true;
+			}
+		}
+		
+		if(shootAuto) {
+			if(!limitTwo.get()) {
+				arm.set(0.5);
+			}else {
+				arm.set(0);
+				pusherOpen.set(false);
 				pusherClose.set(true);
 				clawOpen.set(false);
 				clawClose.set(true);
-				driveBy = false;
+				shootAuto = false;
 			}
 		}
 		
@@ -494,9 +557,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		pusherClose.set(false);
 		clawOpen.set(true);
 		clawClose.set(false);
-		isClosed = true;
 		scissor = false;
-		toBePushed = false;
 		clawSeq = 0;
 		
 		mLeft.setInverted(false);
@@ -529,8 +590,6 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		}
 		
 
-		SmartDashboard.putBoolean("IS CLOSED", isClosed);
-		SmartDashboard.putBoolean("To be pushed", toBePushed);
 		SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
  		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
 
@@ -544,15 +603,13 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		if(controllerDrive.getStartButton()) {
 			pusherOpen.set(true);
 			pusherClose.set(false);
-			isClosed = true;
-			scissor = false;
-			toBePushed = false;
+			clawThingy = false;
 		}
 		
 		if(controllerDrive.getBackButton()) {
-			isClosed = true;
 			pusherOpen.set(false);
 			pusherClose.set(true);
+			clawThingy = true;
 		}
 		
 		clawSeq = (int)timed.get();
@@ -570,24 +627,23 @@ public class Robot extends IterativeRobot implements PIDOutput {
 				clawClose.set(false);
 				break;
 			case 3:
-				toBePushed = false;
-				isClosed = false;
 				timed.stop();
 				timed.reset();
 				break;
 		}
 
-		SmartDashboard.putBoolean("Arm limit switch", limitOne.get());
-		
-//		 What are we using this limit switch for?
-		SmartDashboard.putBoolean("LimitSwitchRight", limitTwo.get());
+		SmartDashboard.putBoolean("Arm limit switch top ", limitOne.get());
+		SmartDashboard.putBoolean("Arm limit switch bottom", limitTwo.get());
 
+		//Uses A button to quick punch pusher 
+		//clawOpen.set(!controllerDrive.getAButton());
+		//clawClose.set(controllerDrive.getAButton());
 		
 		if(controllerDrive.getTriggerAxis(hand.kLeft)> 0.1) {
 			arm.set(controllerDrive.getTriggerAxis(hand.kLeft) * -1);
 		} else if(controllerDrive.getTriggerAxis(hand.kRight)> 0.01 && !limitOne.get()) {
 			arm.set(controllerDrive.getTriggerAxis(hand.kRight ));
-		}else if(!limitOne.get() && controllerDrive.getTriggerAxis(hand.kLeft)< 0.01){
+		}else if(limitTwo.get() && controllerDrive.getTriggerAxis(hand.kLeft)< 0.01){
 			arm.set(0);
 		}else{
 			arm.set(0);
@@ -602,6 +658,15 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		lWinch.set(controllerClimb.getTriggerAxis(hand.kLeft));
 		rWinch.set(controllerClimb.getTriggerAxis(hand.kRight));
+		
+		if(controllerClimb.getBackButtonPressed()) {
+			clawOpen.set(false);
+			clawClose.set(true);
+		}
+		if(controllerClimb.getStartButtonPressed()) {
+			clawOpen.set(true);
+			clawClose.set(false);
+		}
 			SmartDashboard.updateValues();
 
 	}
@@ -613,24 +678,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	 */
 	@Override
 	public void testInit() {
-		ahrs.zeroYaw();
-		timed.stop();
-		timed.reset();
-		scissorOpen.set(true);
-		scissorClose.set(false);
-		if(controllerDrive.getBackButton()) {
-			SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
-	 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
- 		}else if(controllerDrive.getStartButton()) {
- 			SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
-	 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
- 		}
- 		else {
- 			SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
-	 		SmartDashboard.putBoolean("Back Button", controllerDrive.getBackButton());
- 		}
-		ahrs.zeroYaw();
-		SmartDashboard.updateValues();
+
 	}
 	
 	
@@ -642,165 +690,52 @@ public class Robot extends IterativeRobot implements PIDOutput {
  	public void testPeriodic() {
 		 SmartDashboard.putNumber("navX Yaw", ahrs.getYaw());
 		 
-		 if(ahrs.getYaw() > -90) {
-			mRight.set(0.5);
-			mLeft.set(0.5);
-		 }else {
-			mRight.set(0);
-			mLeft.set(0);
-		 }
+		 if(controllerDrive.getBButtonPressed()) {
+				clawOpen.set(false);
+				clawClose.set(true);
+			}
+			if(controllerDrive.getXButtonPressed()) {
+				clawOpen.set(true);
+				clawClose.set(false);
+			}
+			
+			if(controllerClimb.getStartButtonPressed()) {
+				scissorOpen.set(false);
+				scissorClose.set(true);
+			}
+			if(controllerClimb.getBackButtonPressed()) {
+				scissorOpen.set(true);
+				scissorClose.set(false);
+			}
 		 
-//		|| (ahrs.getYaw() < -90 && ahrs.getYaw() > -110)
+			if(controllerDrive.getBumperPressed(hand.kLeft)) {
+				pusherOpen.set(false);
+				pusherClose.set(true);
+			}
+			
+			if(controllerDrive.getBumperPressed(hand.kRight)) {
+				pusherOpen.set(true);
+				pusherClose.set(false);
+			}
+			
+			lSpeed = controllerDrive.getY(hand.kLeft);
+			rSpeed = controllerDrive.getY(hand.kRight);
 
-//			 if(ahrs.getYaw() > -100  ) {
-//				mRight.set(-0.4);
-//				mLeft.set(-0.4);
-//			 }else {
-//				mRight.set(0);
-//				mLeft.set(0);
-//			 }
-		 
-//			turnController.setSetpoint(15.0f);
-//			
-//			SmartDashboard.putData("Rotate PID Loop", turnController);
-//			SmartDashboard.putNumber("Angle Error", turnController.getError());
-//			SmartDashboard.putData("Tank Drive", drive);
-//			SmartDashboard.putNumber("Rotate PID Output", rotateToAngleRate);
-//			turnController.enable();
-//			double left = rotateToAngleRate;
-//			double right = rotateToAngleRate;
-//			mRight.set(right);
-//			mLeft.set(left);
-//			drive.tankDrive(left, right);
-//			
-//			
-//			SmartDashboard.updateValues();
-		 /*
-
- 		lSpeed = controller.getY(hand.kLeft); // sets left motor speed based off of y value
- 		rSpeed = controller.getY(hand.kRight); // sets right motor speed based off of y value
-
-// 		drive.tankDrive(rSpeed,lSpeed);
-
- 		if(controller.getBButtonPressed() && !(scissor)) { // opens scissor lift when B button pressed
- 			scissorOpen.set(true);
- 			scissorClose.set(false);
- 			scissor = true;
- 			
- 		}
-
- 		if(controller.getXButtonPressed() && scissor) { // closes scissor lift when X button pressed
- 			scissorOpen.set(false);
- 			scissorClose.set(true);
- 			scissor = false;
- 			
-	 }
-
- 		 if(controller.getBumper(hand.kRight) && isClosed){ // opens claw when right Bumper is pressed 
- 			clawOpen.set(true);
- 			clawClose.set(false);
- 			isClosed = false;
- 		}
- 		if(controller.getBumper(hand.kLeft) && !(isClosed)){ // closes claw when left bumper is pressed
- 			clawOpen.set(false);
- 			clawClose.set(true);
- 			isClosed = true;
- 		}
-
- 		SmartDashboard.putBoolean("Start Button", controller.getStartButton());
- 		SmartDashboard.putBoolean("Back Button", controller.getBackButton());
- 		
- 		if(stick.getRawButton(3)) { // runs left winch backwards when button 3 is pressed
- 			lWinch.set(-1);
- 		}else { // if button 3 is not pressed winch motors will not activate
- 			lWinch.set(0);
- 		}
- 		
- 		if(stick.getRawButton(4)) { // runs winch forward if button 4 is pressed 
- 			rWinch.set(1);
- 		}else {// if button 3 is not pressed winch will not run
- 			rWinch.set(0);
- 		}
- 		
- 		if(controller.getTriggerAxis(hand.kLeft)>= 0.01) {
-			SmartDashboard.putNumber("ArmL",controller.getTriggerAxis(hand.kLeft));
-			arm.set(controller.getTriggerAxis(hand.kLeft) * -1);
-		}else if(controller.getTriggerAxis(hand.kRight)>= 0.01) {
-			arm.set(controller.getTriggerAxis(hand.kRight ));
-		}else if (controller.getTriggerAxis(hand.kRight)< 0.01 && controller.getTriggerAxis(hand.kLeft)< 0.01){
-			arm.set(0);
-		}
-		else {
-			arm.set(0);
-		}
- 		if(controller.getYButton()) {
- 			timed.start();
- 		}
- 		
- 		if(lEncoder.get()< 2000) {
- 			SmartDashboard.putBoolean("Here i am", true);
- 		} else {
-			SmartDashboard.putBoolean("Here i am", false);
- 		}
- 		
-	 
- 	
-//	 if (stick.getRawButton(5)) { // opens pusher if button 5 is pressed
-//		
-//		 pusherOpen.set(true);
-//		 pusherClose.set(false);
-//	 
-//	  }else { // closes pusher is button 5 is not pressed
-//		  
-//		  pusherOpen.set(false);
-//	 	  pusherClose.set(true);
-//	 	  
-//	  	}
-//	 
-	 if(stick.getRawButton(2)) { // opens claw if button 2 is pressed 
-		 pusherOpen.set(false);
-		 pusherClose.set(true);
-	 }else { // closes claw if button 2 is not pressed 
-		 pusherOpen.set(true);
-		 pusherClose.set(false);
-	 }
-	 
-	 SmartDashboard.putBoolean("turnController Enabled", turnController.isEnabled());
-	 SmartDashboard.putNumber("navX Yaw", ahrs.getYaw());
-    
-     	if ( stick.getRawButton(5)) {
-     		if(ahrs.getYaw() <90) {
-     			drive.tankDrive(1,-1);
-     		}
-//     		if (!turnController.isEnabled()) {
-//     			turnController.setSetpoint(kTargetAngleDegrees);
-//     			rotateToAngleRate = 0; // This value will be updated in the pidWrite() method.
-//     			turnController.enable();
-//     		}
-//     		
-//     		double leftStickValue = rotateToAngleRate;
-//     		double rightStickValue = rotateToAngleRate;
-//     		SmartDashboard.putNumber("Turn Value Left", leftStickValue);
-//     		SmartDashboard.putNumber("Turn Value Right", rightStickValue);
-//     		drive.tankDrive(leftStickValue,  rightStickValue);
-     		
-     	} else if (stick.getRawButton(6)) { // zeros Yaw if button 6 is pressed 
-     		ahrs.zeroYaw();
-	 
-     	}else { 
-    		if(turnController.isEnabled()) {
-    			turnController.disable();
-    		}
-    		drive.tankDrive(rSpeed,lSpeed);
-    	}
-     	
-     		
-//	 double magnitude = (stick.getY() + stick.getY());
-//		double leftStickValue = magnitude + rotateToAngleRate;
-//		double rightStickValue = magnitude - rotateToAngleRate;
-//		drive.tankDrive(leftStickValue,rightStickValue);
-     	
-	 */
+			drive.tankDrive(rSpeed,lSpeed);
+			
+			lWinch.set(controllerClimb.getTriggerAxis(hand.kLeft));
+			rWinch.set(controllerClimb.getTriggerAxis(hand.kRight));
+			
+			if(controllerDrive.getTriggerAxis(hand.kLeft)> 0.1) {
+				arm.set(controllerDrive.getTriggerAxis(hand.kLeft) * -1);
+			} else if(controllerDrive.getTriggerAxis(hand.kRight)> 0.01 && !limitOne.get()) {
+				arm.set(controllerDrive.getTriggerAxis(hand.kRight ));
+			}else if(limitTwo.get() && controllerDrive.getTriggerAxis(hand.kLeft)< 0.01){
+				arm.set(0);
+			}else{
+				arm.set(0);
+			}
+			
 	 }
 	 
 	 
