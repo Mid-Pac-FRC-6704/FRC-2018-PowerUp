@@ -108,7 +108,14 @@ public class Robot extends IterativeRobot implements PIDOutput {
 	private boolean driveBy;
 	private String middleDrive;
 	private boolean shootAuto;
+	private boolean fire;
+	private boolean clawState;
 	
+	private Timer timer;
+	//private String Timing;
+	private int autoTime;
+	private boolean starter;
+
 	
 	
 	AHRS ahrs;
@@ -168,7 +175,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 
 		new Thread(() -> {
-            UsbCamera usbCam = CameraServer.getInstance().startAutomaticCapture(); // USB camera feed activation
+            UsbCamera usbCam = CameraServer.getInstance().startAutomaticCapture("USB cam", "/dev/video0"); // USB camera feed activation
             usbCam.setResolution(320, 240); // what resolution the camera broadcasts its feed "USB cam", "/dev/video0"
             usbCam.setFPS(60); // IN THE CASE OF CAMERA FAILURE, RENAME CAMERA WITH ABOVE COMMENT!!!
             //Kinect class -> not done yet. Will get too it.
@@ -240,6 +247,17 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		testingThis=false;
 		driveBy = false;
 		shootAuto = false;
+		
+		// TO COPY BELOW TIMED
+		// /////////////////////////////////////////////////////////////////////////
+
+		timer = new Timer();
+		autoTime = 0;
+		starter = true;
+		//Timing = "";
+		// /////////////////////////////////////////////////////////////////////////
+
+
 	}
 
 	/**
@@ -260,6 +278,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 //		clawClose.set(true);
 		scissor = false;
 		clawSeq = -1;
+		starter = false;
 	}
 	
 	/**
@@ -280,6 +299,17 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		if(controllerClimb.getBButtonPressed()) {
 			AutoChoose = "Right";
 		}
+		// TO COPY BELOW B BUTTON PRESSED
+///////////////////////////////////////////////////////////////////////////////////////
+
+		if(controllerClimb.getYButtonPressed()) 
+		{
+
+			AutoChoose = "Timed";
+
+		}
+/////////////////////////////////////////////////////////////////////////
+
 		SmartDashboard.putString("Autonomous Selecting", AutoChoose);
 		if(controllerDrive.getBackButton()) {
 			SmartDashboard.putBoolean("Start Button", controllerDrive.getStartButton());
@@ -319,8 +349,12 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		scissorOpen.set(true);
 		scissorClose.set(false);
 		scissor = false;
+		shootAuto = false;
+		fire = false;
 		clawSeq = -1;
 		turning = "";
+		ahrs.zeroYaw();
+		starter = true; //If use timer change to true
 //		mLeft.setInverted(true);
 //		rEncoder.reset();
 //		lEncoder.reset();
@@ -336,6 +370,14 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		SmartDashboard.putNumber("Left Encoder", lEncoder.get());
 		SmartDashboard.putString("Game Field Data", gameFieldData.charAt(0) + " ");
 //		
+		boolean rotateLeft = false;
+		
+		pusherOpen.set(true);
+		pusherClose.set(false);
+		if(starter) {
+			timer.start();
+			starter = false;
+		}
 //		rDistanceController.disable(); //Enable when ready. Disabled because of crash
 //		lDistanceController.disable(); //Enable when ready. Disabled because of crash
 		/*
@@ -353,6 +395,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		
 		switch (AutoChoose) {
 			case "Left":
+				/*
 				if(gameFieldData.charAt(0) == 'L') {
 					if(rEncoder.get() < 16000 && lEncoder.get() < 16000) {
 						mRight.set(0.45);
@@ -374,8 +417,20 @@ public class Robot extends IterativeRobot implements PIDOutput {
 						AutoChoose = "";
 					}
 				}
+				*/
+				if(rEncoder.get() < 11000 && lEncoder.get() < 11000) {
+					mRight.set(0.45);
+					mLeft.set(-0.45);
+				}else {
+					mRight.set(0);
+					mLeft.set(0);
+					AutoChoose = "";
+					turning = "";
+					middleDrive = "";
+				}
 				break;
 			case "Right":
+				/*
 				if(gameFieldData.charAt(0) == 'L') {
 					if(rEncoder.get() < 16000 && lEncoder.get() < 16000) {
 						mRight.set(0.45);
@@ -397,9 +452,23 @@ public class Robot extends IterativeRobot implements PIDOutput {
 						turning = "Right";
 					}
 				}
+				*/
+				if(rEncoder.get() < 11000 && lEncoder.get() < 11000) {
+					mRight.set(0.45);
+					mLeft.set(-0.45);
+				}else {
+					mRight.set(0);
+					mLeft.set(0);
+					AutoChoose = "";
+					turning = "";
+					middleDrive = "";
+				}
+				
+
 				break;
+				
 			case "Middle":
-				if(rEncoder.get() < 7000 && lEncoder.get() < 7000) {
+				if(rEncoder.get() < 5500 && lEncoder.get() < 5500) {
 					mRight.set(0.45);
 					mLeft.set(-0.45);
 				}else {
@@ -413,11 +482,201 @@ public class Robot extends IterativeRobot implements PIDOutput {
 					}
 				}
 				break;
+			//////////////////////////////////////////////////////////////////////////////////////
+				//TO COPY BELOW MIDDLE OF AUTO
+
+
+			case("Timed"):
+
+			autoTime =(int)timer.get();
+
+			SmartDashboard.putNumber("Auto Timer", autoTime);
+			  
+			if(gameFieldData.charAt(0) == 'L'){
+			      
+			switch(autoTime){
+			        
+			// Go Forward
+			        
+			case 1:
+			          
+				mRight.set(0.4);
+			          
+				mLeft.set(-0.4);
+			          
+				break;
+			          
+			// Turning 
+			          
+			case 2:
+			          
+				mRight.set(-0.5);
+			          
+				mLeft.set(-0.5);
+			          
+			break;
+			          
+			// Go Forward
+			          
+			case 3:
+			          
+				mRight.set(0.44);
+			          
+				mLeft.set(-0.44);
+			          
+			break;
+			          
+			// Turning to the thingy
+			          
+			case 6:
+			          
+				mRight.set(0.55);
+			          
+				mLeft.set(0.55);
+			          
+			break;
+			          
+			// go forward
+			          
+			case 7:
+			          
+				mRight.set(0.4);
+			          
+				mLeft.set(-0.4);
+			          
+			break;
+			          
+			case 9:
+			          
+			// set arm down
+			          
+				mRight.set(0);
+			          
+				mLeft.set(0);
+			          
+				arm.set(-0.4);
+			          
+				break;
+			          
+				// stop arm
+			          
+			case 10:
+			          
+				arm.set(0);
+			          
+			break;
+			          
+			// push it on
+			          
+			case 11:
+			          
+				pusherOpen.set(false);
+			          
+				pusherClose.set(true);
+			          
+				clawOpen.set(false);
+			          
+				clawClose.set(true);
+			          
+				break;
+			          
+				// turn off timer
+			          
+				case 12:
+			          
+				pusherOpen.set(true);
+			          
+				pusherClose.set(false);
+			          
+				clawOpen.set(true);
+			          
+				clawClose.set(false);
+			          
+				timer.stop();
+			          
+				timer.reset();
+			          
+				AutoChoose = "";
+			          
+			break;
+
+			        
+			}
+			      
+			}else{
+			        
+			switch(autoTime){
+			          // Go Forward
+			          case 1:
+			            mRight.set(0.4);
+			            mLeft.set(-0.4);
+			            break;
+			            // Turning
+			            case 2:
+			            mRight.set(0.5);
+			            mLeft.set(0.5);
+			            break;
+			            // Go Forward
+			            case 3:
+			            mRight.set(0.46);
+			            mLeft.set(-0.46);
+			            break;
+			            // Turning to the thingy
+			            case 6:
+			            mRight.set(-0.55);
+			            mLeft.set(-0.55);
+			            break;
+			            // go forward
+			            case 7:
+			            mRight.set(0.38);
+			            mLeft.set(-0.38);
+			            break;
+			            case 9:
+			            // set arm down
+			            mRight.set(0);
+			            mLeft.set(0);
+			            arm.set(-0.4);
+			            break;
+			            // stop arm
+			            case 10:
+			            arm.set(0);
+			            break;
+			            // push it on
+			            case 11:
+			            pusherOpen.set(false);
+			            pusherClose.set(true);
+			            clawOpen.set(false);
+			            clawClose.set(true);
+			            break;
+			            // turn off timer
+			            case 12:
+			              pusherOpen.set(true);
+			              pusherClose.set(false);
+			              clawOpen.set(true);
+			              clawClose.set(false);
+			              timer.stop();
+			              timer.reset();
+			              AutoChoose = "";
+			            break;
+
+			          }
+			      }
+			break;
+
+
+			////////////////////////////////////////////////////////////////////////////////
+
+				
+				
+				
+				
+			//////////////////////////////////////////////////////////////////////////////////////
+				
 		}
 		
 		switch(middleDrive){
 			case "Left":
-				if(ahrs.getYaw() < 130) {
+				if(ahrs.getYaw() < 70) {
 					mRight.set(-0.55);
 					mLeft.set(-0.55);
 				}else{
@@ -429,7 +688,7 @@ public class Robot extends IterativeRobot implements PIDOutput {
 				}
 				break;
 			case "Right":
-				if(ahrs.getYaw() > -130) {
+				if(ahrs.getYaw() > -70) {
 					mRight.set(0.55);
 					mLeft.set(0.55);
 				}else{
@@ -437,16 +696,18 @@ public class Robot extends IterativeRobot implements PIDOutput {
 					mLeft.set(0);
 					lEncoder.reset();
 					rEncoder.reset();
+					
 					middleDrive = "Drive A Bit";
 				}
 				break;
 			case "Drive A Bit":
-				if(lEncoder.get()<4000 && rEncoder.get() < 4000) {
+				if(lEncoder.get()<4800 && rEncoder.get() < 4800) {
 					mRight.set(0.55);
 					mLeft.set(-0.55);
 				}else {
 					mRight.set(0);
 					mLeft.set(0);
+//					ahrs.zeroYaw();
 					if(gameFieldData.charAt(0) == 'L') {
 						middleDrive = "Rotate Right";
 					}else {
@@ -455,10 +716,11 @@ public class Robot extends IterativeRobot implements PIDOutput {
 				}
 				break;
 				
-			case "Rotate left":
-				if(ahrs.getYaw() < 130) {
+			case "Rotate Left":
+				if(ahrs.getYaw() <= -7) {
 					mRight.set(-0.55);
 					mLeft.set(-0.55);
+					rotateLeft = true;
 				}else{
 					mRight.set(0);
 					mLeft.set(0);
@@ -466,10 +728,11 @@ public class Robot extends IterativeRobot implements PIDOutput {
 					rEncoder.reset();
 					driveBy = true;
 					middleDrive = "";
+					rotateLeft = false;
 				}
 				break;
 			case "Rotate Right":
-				if(ahrs.getYaw() > -130) {
+				if(ahrs.getYaw() >= 7) {
 					mRight.set(0.55);
 					mLeft.set(0.55);
 				}else{
@@ -481,7 +744,6 @@ public class Robot extends IterativeRobot implements PIDOutput {
 					middleDrive = "";
 				}
 				break;
-			
 		}
 		
 		switch(turning) {
@@ -516,32 +778,64 @@ public class Robot extends IterativeRobot implements PIDOutput {
 		}
 		
 		if(driveBy) {
-			if(rEncoder.get() < 1000) {
+			timer.reset();
+			fire = true;
+			if(rEncoder.get() > 500) {
+				arm.set(-0.45);
+			}
+			if(rEncoder.get() < 2850) {
 				mRight.set(0.45);
 				mLeft.set(0.-45);
-			}else if(rEncoder.get() > 1000) {
+			}else if(rEncoder.get() > 2850) {
+				//arm.set(-0.5);
+				//rotateLeft = true;
 				mRight.set(0);
 				mLeft.set(0);
-				pusherOpen.set(false);
-				driveBy = false;
-				shootAuto = true;
+				//pusherOpen.set(true);
+				//pusherClose.set(false);
+				//clawOpen.set(true);
+				//clawClose.set(false);
+				//driveBy = false;
+				//shootAuto = true;
 			}
 		}
 		
+		/*
 		if(shootAuto) {
 			if(!limitTwo.get()) {
-				arm.set(0.5);
+				arm.set(-0.5);
 			}else {
+				rotateLeft = true;
 				arm.set(0);
+				clawOpen.set(false);
+				clawClose.set(true);
+				pusherOpen.set(false);
+				pusherClose.set(true);
+				shootAuto = false;
+			}
+		}
+		*/
+		
+		if(fire) {
+			if(timer.get() > 5) {
+				pusherOpen.set(true);
+				pusherClose.set(false);
+				clawOpen.set(true);
+				clawClose.set(false);
+				clawState = true;
+				
+			}else {
 				pusherOpen.set(false);
 				pusherClose.set(true);
 				clawOpen.set(false);
-				clawClose.set(true);
-				shootAuto = false;
+				clawClose.set(false);
+				clawState = false;
 			}
 		}
 		
 		SmartDashboard.putNumber("navX Yaw", ahrs.getYaw());
+		SmartDashboard.putString("Middle Drive", middleDrive);
+		SmartDashboard.putBoolean("Claw", clawState);
 		SmartDashboard.updateValues();
 	}
 	/**
